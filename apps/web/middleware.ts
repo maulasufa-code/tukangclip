@@ -26,5 +26,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dasbor/:path*", "/unggah/:path*", "/studio/:path*", "/kredit", "/masuk", "/daftar"]
+  matcher: ["/dasbor/:path*", "/unggah/:path*", "/studio/:path*", "/kredit", "/pasar", "/kampanye/:path*", "/kerjaanku", "/masuk", "/daftar"]
 };

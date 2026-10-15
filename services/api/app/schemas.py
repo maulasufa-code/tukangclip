@@ -5,6 +5,7 @@ class PresignRequest(BaseModel):
     filename: str = Field(max_length=80)
     bytes: int
     mime: str = "video/mp4"
+    kind: str = "source"
 
 
 class PresignResponse(BaseModel):
@@ -40,6 +41,35 @@ class PlanSave(BaseModel):
 
 class PlanOut(BaseModel):
     version: int
+
+
+class CampaignCreate(BaseModel):
+    title: str = Field(max_length=120)
+    brief: str = ""
+    sourceUrl: str | None = None
+    sourceR2Key: str | None = None
+    budgetTotal: int
+    ratePer1000: int
+    capPerClip: int
+    deadlineAt: str | None = None
+
+
+class Decision(BaseModel):
+    accept: bool
+
+
+class SubmissionCreate(BaseModel):
+    applicationId: str
+    fileR2Key: str
+
+
+class Review(BaseModel):
+    approve: bool
+
+
+class Posted(BaseModel):
+    url: str
+    platform: str
 
 
 class JobOut(BaseModel):

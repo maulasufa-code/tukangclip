@@ -16,11 +16,14 @@ def r2_client():
     )
 
 
-def presigned_put(user_id: str, filename: str, size: int) -> tuple[str, str, str]:
+def presigned_put(user_id: str, filename: str, size: int, kind: str = "source") -> tuple[str, str, str]:
     if size <= 0 or size > config.MAX_UPLOAD_BYTES:
         raise ValueError("ukuran-tidak-valid")
+    if kind not in ("source", "submission"):
+        raise ValueError("jenis-tidak-valid")
     safe = re.sub(r"[^a-zA-Z0-9._-]+", "-", filename)[:80] or "video.mp4"
-    key = f"raw/{user_id}/{uuid.uuid4()}-{safe}"
+    folder = "raw" if kind == "source" else "submissions"
+    key = f"{folder}/{user_id}/{uuid.uuid4()}-{safe}"
     idem = str(uuid.uuid4())
     url = r2_client().generate_presigned_url(
         "put_object",

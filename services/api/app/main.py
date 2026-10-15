@@ -5,23 +5,26 @@ from . import credits as creditsmod
 from . import r2 as r2mod
 from . import supabase_client as supa
 from . import xendit as xenditmod
-from .schemas import JobCreate, JobOut, PlanOut, PlanSave, PresignRequest, PresignResponse
+from .authz import require_role, require_user
+from .schemas import (
+    JobCreate,
+    JobOut,
+    PlanOut,
+    PlanSave,
+    PresignRequest,
+    PresignResponse,
+)
 
-app = FastAPI(title="TukangClip API", version="0.2.0")
+app = FastAPI(title="TukangClip API", version="0.6.0")
+
+from .marketplace import router as marketplace_router
+
+app.include_router(marketplace_router)
 
 
 @app.get("/health")
 def health():
     return {"ok": True}
-
-
-def require_user(authorization: str | None) -> str:
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="unauthorized")
-    user_id = supa.user_id_from_token(authorization.removeprefix("Bearer ").strip())
-    if not user_id:
-        raise HTTPException(status_code=401, detail="unauthorized")
-    return user_id
 
 
 @app.post("/r2/presign", response_model=PresignResponse)
@@ -30,7 +33,7 @@ def create_presign(body: PresignRequest, authorization: str | None = Header(defa
     if body.mime != "video/mp4":
         raise HTTPException(status_code=400, detail="hanya-mp4")
     try:
-        url, key, idem = r2mod.presigned_put(user_id, body.filename, body.bytes)
+        url, key, idem = r2mod.presigned_put(user_id, body.filename, body.bytes, body.kind)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return PresignResponse(uploadUrl=url, r2Key=key, idempotencyKey=idem)
