@@ -1,0 +1,12 @@
+-- Uji RLS Fase 1. Jalankan manual setelah migrasi memakai dua user uji.
+-- Harapan:
+-- 1. User A tidak bisa select profile_private milik user B (0 baris).
+-- 2. User A tidak bisa select ai_jobs milik user B (0 baris).
+-- 3. insert ai_jobs dengan owner_id orang lain ditolak.
+-- 4. claim_next_ai_job hanya bisa dipanggil service role (uji via backend, bukan anon key).
+
+-- sebagai user A:
+-- select * from profile_private; -- hanya 1 baris milik sendiri
+-- select * from ai_jobs; -- hanya milik sendiri
+-- insert into ai_jobs (owner_id, source_r2_key, source_bytes, idempotency_key)
+-- values ('<uuid-user-B>', 'raw/x.mp4', 10, 'coba-ditolak'); -- harus gagal RLS
