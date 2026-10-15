@@ -2,7 +2,7 @@ from fastapi import FastAPI, Header, HTTPException
 from . import config
 from . import r2 as r2mod
 from . import supabase_client as supa
-from .schemas import JobCreate, JobOut, PresignRequest, PresignResponse
+from .schemas import JobCreate, JobOut, PlanOut, PlanSave, PresignRequest, PresignResponse
 
 app = FastAPI(title="TukangClip API", version="0.2.0")
 
@@ -66,3 +66,53 @@ def get_job(job_id: str, authorization: str | None = Header(default=None)):
     if not j or j["owner_id"] != user_id:
         raise HTTPException(status_code=404, detail="tidak-ditemukan")
     return JobOut(id=j["id"], status=j["status"], r2Key=j["source_r2_key"])
+
+
+def check_moments(moments) -> None:
+    if not 5 <= len(moments) <= 10:
+        raise HTTPException(status_code=400, detail="momen-harus-5-10")
+    ordered = sorted(moments, key=lambda m: m.start)
+    for i, m in enumerate(ordered):
+        dur = m.end - m.start
+        if not 30 <= dur <= 60:
+            raise HTTPException(status_code=400, detail=f"durasi-momen-{i + 1}")
+        if not m.hook.strip():
+            raise HTTPException(status_code=400, detail=f"hook-kosong-{i + 1}")
+        if i > 0 and m.start < ordered[i - 1].end:
+            raise HTTPException(status_code=400, detail="momen-tumpang-tindih")
+
+
+@app.post("/plans", response_model=PlanOut)
+def save_plan(body: PlanSave, authorization: str | None = Header(default=None)):
+    user_id = require_user(authorization)
+    check_moments(body.moments)
+    client = supa.service_client()
+    job = client.table("ai_jobs").select("owner_id").eq("id", body.jobId).single().execute().data
+    if not job or job["owner_id"] != user_id:
+        raise HTTPException(status_code=404, detail="tidak-ditemukan")
+    vers = client.table("edit_plans").select("version").eq("job_id", body.jobId).execute().data or []
+    version = (max([v["version"] for v in vers]) if vers else 0) + 1
+    client.table("edit_plans").insert(
+        {
+            "job_id": body.jobId,
+            "version": version,
+            "plan": {
+                "moments": [m.model_dump() for m in body.moments],
+                "titles": body.titles.model_dump()
+            },
+        }
+    ).execute()
+    return PlanOut(version=version)
+
+
+@app.post("/jobs/{job_id}/rerender", response_model=JobOut)
+def rerender(job_id: str, authorization: str | None = Header(default=None)):
+    user_id = require_user(authorization)
+    client = supa.service_client()
+    job = client.table("ai_jobs").select("*").eq("id", job_id).single().execute().data
+    if not job or job["owner_id"] != user_id:
+        raise HTTPException(status_code=404, detail="tidak-ditemukan")
+    client.table("ai_jobs").update(
+        {"status": "rendering", "lease_until": None, "last_error": None}
+    ).eq("id", job_id).execute()
+    return JobOut(id=job["id"], status="rendering", r2Key=job["source_r2_key"])
