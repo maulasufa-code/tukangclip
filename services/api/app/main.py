@@ -217,6 +217,39 @@ async def xendit_webhook(request: Request):
         raise HTTPException(status_code=404, detail="intent-tidak-ditemukan")
     if intent["status"] == "paid":
         return {"ok": True}
+    if intent.get("campaign_id"):
+        net = intent["amount"] - intent["fee"]
+        camp = client.table("campaigns").select("budget_remaining").eq("id", intent["campaign_id"]).single().execute().data
+        client.table("topup_intents").update({"status": "paid"}).eq("id", intent["id"]).execute()
+        client.table("campaigns").update(
+            {
+                "budget_remaining": (camp["budget_remaining"] if camp else 0) + net,
+                "escrow": "locked",
+            }
+        ).eq("id", intent["campaign_id"]).execute()
+        client.table("money_ledger").insert(
+            {
+                "group_id": intent["id"],
+                "account": "cash:xendit",
+                "user_id": intent["user_id"],
+                "campaign_id": intent["campaign_id"],
+                "debit": 0,
+                "credit": net,
+                "idempotency_key": f"fund:{intent['idempotency_key']}:credit",
+            }
+        ).execute()
+        client.table("money_ledger").insert(
+            {
+                "group_id": intent["id"],
+                "account": f"escrow:{intent['campaign_id']}",
+                "user_id": intent["user_id"],
+                "campaign_id": intent["campaign_id"],
+                "debit": net,
+                "credit": 0,
+                "idempotency_key": f"fund:{intent['idempotency_key']}:debit",
+            }
+        ).execute()
+        return {"ok": True}
     balance = creditsmod.balance_of(client, intent["user_id"])
     credited = client.table("ai_credit_ledger").insert(
         {

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { apiGet } from "@/lib/api";
-import { LamarButton, PutusanButtons, ReviewButtons, TandaiPosted } from "@/components/pasar-actions";
+import { LamarButton, DanaiButton, PutusanButtons, ReviewButtons, SengketaBox, TandaiPosted } from "@/components/pasar-actions";
 
 interface App {
   id: string;
@@ -49,6 +49,7 @@ export default async function KampanyePage({ params }: { params: { id: string } 
       )}
       <div className="mt-4">
         <LamarButton campaignId={params.id} mine={mine} />
+        {mine && <DanaiButton campaignId={params.id} />}
       </div>
 
       {mine && (
@@ -71,11 +72,12 @@ export default async function KampanyePage({ params }: { params: { id: string } 
             <p className="mt-1 text-sm text-stone-600">Belum ada submission.</p>
           ) : (
             <ul className="mt-2 space-y-2 text-sm">
-              {subs.items.map((s: { id: string; status: string; file_r2_key: string }) => (
+              {subs.items.map((s: { id: string; status: string; file_r2_key: string; flagged?: boolean }) => (
                 <li key={s.id} className="rounded-md border border-stone-200 p-3">
                   <p>Status: {s.status} · {s.file_r2_key}</p>
                   {s.status === "submitted" && <div className="mt-2"><ReviewButtons subId={s.id} /></div>}
                   {s.status === "approved" && <TandaiPosted subId={s.id} />}
+                  <SengketaBox subId={s.id} flagged={!!s.flagged} mine={mine} />
                 </li>
               ))}
             </ul>

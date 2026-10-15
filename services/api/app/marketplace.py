@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Header, HTTPException
+from pydantic import BaseModel
 
 from . import supabase_client as supa
 from .authz import require_role, require_user
@@ -204,3 +205,175 @@ def my_applications(authorization: str | None = Header(default=None)):
     client = supa.service_client()
     rows = client.table("applications").select("*").eq("editor_id", user_id).execute().data or []
     return {"items": rows}
+
+
+class Fund(BaseModel):
+    amount: int
+
+
+class Dispute(BaseModel):
+    note: str = ""
+
+
+class Resolve(BaseModel):
+    clear: bool
+
+
+@router.post("/campaigns/{cid}/fund")
+def fund(cid: str, body: Fund, authorization: str | None = Header(default=None)):
+    import uuid
+
+    from . import xendit as xenditmod
+    from .credits import settings_map
+
+    user_id = require_user(authorization)
+    client = supa.service_client()
+    c = campaign_or_404(client, cid)
+    if c["creator_id"] != user_id:
+        raise HTTPException(status_code=403, detail="bukan-kampanyemu")
+    if body.amount <= 0:
+        raise HTTPException(status_code=400, detail="nominal-tidak-valid")
+    s = settings_map(client)
+    fee = body.amount * int(s.get("platform_fee_pct", 10)) // 100
+    idem = str(uuid.uuid4())
+    saved = (
+        client.table("topup_intents")
+        .insert(
+            {
+                "user_id": user_id,
+                "campaign_id": cid,
+                "amount": body.amount,
+                "fee": fee,
+                "credits": 0,
+                "idempotency_key": idem,
+            }
+        )
+        .execute()
+        .data
+    )
+    if not saved:
+        raise HTTPException(status_code=500, detail="gagal-buat-fund")
+    try:
+        inv = xenditmod.create_invoice(body.amount, f"fund:{idem}")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e)[:100])
+    client.table("topup_intents").update({"xendit_id": inv["id"]}).eq(
+        "idempotency_key", idem
+    ).execute()
+    return {"payUrl": inv["url"], "fee": fee}
+
+
+@router.post("/submissions/{sid}/dispute")
+def dispute(sid: str, body: Dispute, authorization: str | None = Header(default=None)):
+    user_id = require_user(authorization)
+    client = supa.service_client()
+    s = client.table("submissions").select("*").eq("id", sid).single().execute().data
+    if not s:
+        raise HTTPException(status_code=404, detail="tidak-ditemukan")
+    a = client.table("applications").select("*").eq("id", s["application_id"]).single().execute().data
+    c = campaign_or_404(client, a["campaign_id"])
+    if user_id not in (a["editor_id"], c["creator_id"]):
+        raise HTTPException(status_code=403, detail="bukan-pihakmu")
+    client.table("submissions").update(
+        {"flagged": True, "dispute": body.note[:500]}
+    ).eq("id", sid).execute()
+    return {"ok": True, "flagged": True}
+
+
+@router.post("/submissions/{sid}/dispute/resolve")
+def resolve(sid: str, body: Resolve, authorization: str | None = Header(default=None)):
+    user_id = require_user(authorization)
+    client = supa.service_client()
+    s = client.table("submissions").select("*").eq("id", sid).single().execute().data
+    if not s:
+        raise HTTPException(status_code=404, detail="tidak-ditemukan")
+    a = client.table("applications").select("*").eq("id", s["application_id"]).single().execute().data
+    c = campaign_or_404(client, a["campaign_id"])
+    if c["creator_id"] != user_id:
+        raise HTTPException(status_code=403, detail="bukan-kampanyemu")
+    patch = {"flagged": not body.clear, "dispute": "" if body.clear else s.get("dispute", "")}
+    client.table("submissions").update(patch).eq("id", sid).execute()
+    return {"ok": True, "flagged": patch["flagged"]}
+
+
+@router.post("/submissions/{sid}/payout")
+def payout(sid: str, authorization: str | None = Header(default=None)):
+    import uuid
+    from datetime import datetime, timezone
+
+    from . import xendit as xenditmod
+    from .credits import settings_map
+    from .payouts import compute_payout, ledger_pair
+
+    user_id = require_user(authorization)
+    client = supa.service_client()
+    s = client.table("submissions").select("*").eq("id", sid).single().execute().data
+    if not s:
+        raise HTTPException(status_code=404, detail="tidak-ditemukan")
+    a = client.table("applications").select("*").eq("id", s["application_id"]).single().execute().data
+    c = campaign_or_404(client, a["campaign_id"])
+    if c["creator_id"] != user_id:
+        raise HTTPException(status_code=403, detail="bukan-kampanyemu")
+    if s["status"] not in ("posted", "tracking"):
+        raise HTTPException(status_code=400, detail="belum-tayang")
+    if s.get("flagged"):
+        raise HTTPException(status_code=400, detail="tersangkut-sengketa")
+    sm = settings_map(client)
+    hold = int(sm.get("view_hold_days", 7))
+    posted_at = datetime.fromisoformat(s["posted_at"])
+    if datetime.now(timezone.utc) < posted_at + timedelta(days=hold):
+        raise HTTPException(status_code=400, detail="masa-tahan-belum-lewat")
+    snaps = (
+        client.table("view_snapshots")
+        .select("views")
+        .eq("submission_id", sid)
+        .execute()
+        .data
+        or []
+    )
+    final_views = max([x["views"] for x in snaps]) if snaps else 0
+    amount = compute_payout(
+        s.get("views_final") or final_views,
+        c["rate_per_1000_views"],
+        c["cap_per_clip"],
+        c["budget_remaining"],
+    )
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="insentif-nol")
+    group = str(uuid.uuid4())
+    idem = str(uuid.uuid4())
+    for leg in ledger_pair(group, c["id"], a["editor_id"], sid, amount, idem):
+        done = client.table("money_ledger").insert(leg).execute().data
+        if not done:
+            raise HTTPException(status_code=409, detail="sudah-dibayar")
+    acct = (
+        client.table("payout_accounts")
+        .select("*")
+        .eq("user_id", a["editor_id"])
+        .eq("is_verified", True)
+        .execute()
+        .data
+    )
+    if not acct:
+        raise HTTPException(status_code=400, detail="rekening-editor-belum-verifikasi")
+    try:
+        disb = xenditmod.create_disbursement(
+            amount, acct[0]["provider"], acct[0]["account_ref"], acct[0]["account_name"], f"pay:{idem}"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e)[:100])
+    client.table("payouts").insert(
+        {
+            "editor_id": a["editor_id"],
+            "submission_id": sid,
+            "amount": amount,
+            "xendit_id": disb["id"],
+            "status": "processing",
+            "idempotency_key": idem,
+        }
+    ).execute()
+    client.table("submissions").update({"status": "paid_out"}).eq("id", sid).execute()
+    client.table("campaigns").update(
+        {"budget_remaining": c["budget_remaining"] - amount}
+    ).eq("id", c["id"]).execute()
+    return {"ok": True, "amount": amount}

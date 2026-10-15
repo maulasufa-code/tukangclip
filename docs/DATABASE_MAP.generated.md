@@ -2,7 +2,7 @@
 
 Dibuat otomatis dari SQL. Jangan edit manual. Jalankan `npm run db:map`.
 
-Migrasi terbaca: 20261015_fase1_profiles_jobs.sql, 20261016_full_platform.sql, 20261018_render_claim.sql, 20261019_credit_topup.sql
+Migrasi terbaca: 20261015_fase1_profiles_jobs.sql, 20261016_full_platform.sql, 20261018_render_claim.sql, 20261019_credit_topup.sql, 20261020_payout_tracking.sql
 
 Tipe: user_role (20261015_fase1_profiles_jobs.sql), ai_job_status (20261015_fase1_profiles_jobs.sql), submission_status (20261016_full_platform.sql), campaign_status (20261016_full_platform.sql), escrow_status (20261016_full_platform.sql), application_status (20261016_full_platform.sql), payout_status (20261016_full_platform.sql)
 
