@@ -18,8 +18,10 @@ from .schemas import (
 app = FastAPI(title="TukangClip API", version="0.6.0")
 
 from .marketplace import router as marketplace_router
+from .distribusi import router as distribusi_router
 
 app.include_router(marketplace_router)
+app.include_router(distribusi_router)
 
 
 @app.get("/health")

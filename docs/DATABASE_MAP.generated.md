@@ -2,7 +2,7 @@
 
 Dibuat otomatis dari SQL. Jangan edit manual. Jalankan `npm run db:map`.
 
-Migrasi terbaca: 20261015_fase1_profiles_jobs.sql, 20261016_full_platform.sql, 20261018_render_claim.sql, 20261019_credit_topup.sql, 20261020_payout_tracking.sql
+Migrasi terbaca: 20261015_fase1_profiles_jobs.sql, 20261016_full_platform.sql, 20261018_render_claim.sql, 20261019_credit_topup.sql, 20261020_payout_tracking.sql, 20261021_social.sql
 
 Tipe: user_role (20261015_fase1_profiles_jobs.sql), ai_job_status (20261015_fase1_profiles_jobs.sql), submission_status (20261016_full_platform.sql), campaign_status (20261016_full_platform.sql), escrow_status (20261016_full_platform.sql), application_status (20261016_full_platform.sql), payout_status (20261016_full_platform.sql)
 
@@ -241,6 +241,24 @@ Sumber: `20261016_full_platform.sql`
 - updated_at timestamptz not null default now()
 
 Policy (1): settings_read_all (20261016_full_platform.sql)
+
+## public.social_accounts
+
+Sumber: `20261021_social.sql`
+
+- id uuid primary key default gen_random_uuid()
+- user_id uuid not null references auth.users (id) on delete cascade
+- platform text not null
+- account_name text not null default ''
+- access_token text not null
+- refresh_token text
+- expires_at timestamptz
+- created_at timestamptz not null default now()
+- updated_at timestamptz not null default now()
+- unique (user_id, platform)
+- constraint social_platform check (platform in ('youtube', 'tiktok', 'meta'))
+
+Policy (1): social_read_own (20261021_social.sql)
 
 ## public.submissions
 

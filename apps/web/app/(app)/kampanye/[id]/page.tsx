@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { apiGet } from "@/lib/api";
-import { LamarButton, DanaiButton, PutusanButtons, ReviewButtons, SengketaBox, TandaiPosted } from "@/components/pasar-actions";
+import { LamarButton, DanaiButton, PutusanButtons, ReviewButtons, SengketaBox, TandaiPosted, TerbitButton } from "@/components/pasar-actions";
 
 interface App {
   id: string;
@@ -32,6 +32,7 @@ export default async function KampanyePage({ params }: { params: { id: string } 
 
   const mine = c.creator_id === user.id;
   const subs = mine ? await apiGet(`/campaigns/${params.id}/submissions`).catch(() => null) : null;
+  const stat = await apiGet(`/campaigns/${params.id}/analytics`).catch(() => null);
 
   return (
     <section aria-labelledby="judul-kampanye">
@@ -54,6 +55,19 @@ export default async function KampanyePage({ params }: { params: { id: string } 
 
       {mine && (
         <>
+          <h2 className="mt-8 font-semibold">
+            Analitik{stat ? `: ${stat.clips} klip, ${stat.posted} tayang, ${(stat.total_views as number).toLocaleString("id-ID")} views, Rp${(stat.total_paid as number).toLocaleString("id-ID")} terbayar` : ""}
+          </h2>
+          {stat && stat.rows.length > 0 && (
+            <ul className="mt-2 space-y-1 text-sm">
+              {stat.rows.map((r: { id: string; status: string; views: number }) => (
+                <li key={r.id} className="flex justify-between rounded-md border border-stone-200 p-2">
+                  <span>{r.status}</span>
+                  <span>{r.views.toLocaleString("id-ID")} views</span>
+                </li>
+              ))}
+            </ul>
+          )}
           <h2 className="mt-8 font-semibold">Pelamar ({(c.applications as App[]).length})</h2>
           {(c.applications as App[]).length === 0 ? (
             <p className="mt-1 text-sm text-stone-600">Belum ada pelamar.</p>
@@ -77,6 +91,7 @@ export default async function KampanyePage({ params }: { params: { id: string } 
                   <p>Status: {s.status} · {s.file_r2_key}</p>
                   {s.status === "submitted" && <div className="mt-2"><ReviewButtons subId={s.id} /></div>}
                   {s.status === "approved" && <TandaiPosted subId={s.id} />}
+                  {s.status === "approved" && <TerbitButton subId={s.id} />}
                   <SengketaBox subId={s.id} flagged={!!s.flagged} mine={mine} />
                 </li>
               ))}

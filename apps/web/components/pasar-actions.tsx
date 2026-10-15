@@ -162,3 +162,23 @@ export function SengketaBox({ subId, flagged, mine }: { subId: string; flagged: 
     </div>
   );
 }
+
+export function TerbitButton({ subId }: { subId: string }) {
+  const router = useRouter();
+  const [pesan, setPesan] = useState("");
+  return (
+    <div className="mt-2">
+      <button
+        onClick={() =>
+          call(`/submissions/${subId}/publish`, "POST", { platform: "youtube" })
+            .then(() => router.refresh())
+            .catch((e) => setPesan(e.message))
+        }
+        className="min-h-[44px] rounded-md bg-stone-900 px-4 text-sm text-white"
+      >
+        Terbitkan ke YouTube
+      </button>
+      {pesan && <p role="alert" className="mt-1 text-sm text-red-800">{pesan}</p>}
+    </div>
+  );
+}
