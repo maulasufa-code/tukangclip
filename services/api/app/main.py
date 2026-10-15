@@ -1,7 +1,10 @@
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
+from pydantic import BaseModel
 from . import config
+from . import credits as creditsmod
 from . import r2 as r2mod
 from . import supabase_client as supa
+from . import xendit as xenditmod
 from .schemas import JobCreate, JobOut, PlanOut, PlanSave, PresignRequest, PresignResponse
 
 app = FastAPI(title="TukangClip API", version="0.2.0")
@@ -43,17 +46,34 @@ def create_job(body: JobCreate, authorization: str | None = Header(default=None)
     import uuid
 
     client = supa.service_client()
+    cost = 1
+    if creditsmod.balance_of(client, user_id) < cost:
+        raise HTTPException(status_code=402, detail="kredit-kurang")
+    idem = str(uuid.uuid4())
     row = {
         "owner_id": user_id,
         "source_r2_key": body.r2Key,
         "source_bytes": body.bytes,
         "source_mime": body.mime,
-        "idempotency_key": str(uuid.uuid4()),
+        "idempotency_key": idem,
     }
     res = client.table("ai_jobs").insert(row).execute()
     if not res.data:
         raise HTTPException(status_code=500, detail="gagal-buat-job")
     j = res.data[0]
+    spent = client.table("ai_credit_ledger").insert(
+        {
+            "user_id": user_id,
+            "amount": -cost,
+            "balance_after": creditsmod.balance_of(client, user_id) - cost,
+            "reason": "pakai-job-ai",
+            "ref_job_id": j["id"],
+            "idempotency_key": f"spend:{idem}",
+        }
+    ).execute()
+    if not spent.data:
+        client.table("ai_jobs").delete().eq("id", j["id"]).execute()
+        raise HTTPException(status_code=402, detail="kredit-kurang")
     return JobOut(id=j["id"], status=j["status"], r2Key=j["source_r2_key"])
 
 
@@ -116,3 +136,95 @@ def rerender(job_id: str, authorization: str | None = Header(default=None)):
         {"status": "rendering", "lease_until": None, "last_error": None}
     ).eq("id", job_id).execute()
     return JobOut(id=job["id"], status="rendering", r2Key=job["source_r2_key"])
+
+
+class TopupCreate(BaseModel):
+    amount: int
+
+
+@app.get("/credits")
+def credit_balance(authorization: str | None = Header(default=None)):
+    user_id = require_user(authorization)
+    client = supa.service_client()
+    rows = (
+        client.table("ai_credit_ledger")
+        .select("amount,reason,created_at")
+        .eq("user_id", user_id)
+        .execute()
+        .data
+        or []
+    )
+    return {"balance": sum(r["amount"] for r in rows), "history": rows[-20:]}
+
+
+@app.post("/topups")
+def create_topup(body: TopupCreate, authorization: str | None = Header(default=None)):
+    import uuid
+
+    user_id = require_user(authorization)
+    client = supa.service_client()
+    s = creditsmod.settings_map(client)
+    try:
+        q = creditsmod.quote_topup(
+            body.amount,
+            int(s.get("credit_price_idr", 5000)),
+            int(s.get("platform_fee_pct", 10)),
+            int(s.get("min_topup_idr", 10000)),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    idem = str(uuid.uuid4())
+    intent = {
+        "user_id": user_id,
+        "amount": body.amount,
+        "fee": q["fee"],
+        "credits": q["credits"],
+        "idempotency_key": idem,
+    }
+    saved = client.table("topup_intents").insert(intent).execute().data
+    if not saved:
+        raise HTTPException(status_code=500, detail="gagal-buat-topup")
+    try:
+        inv = xenditmod.create_invoice(body.amount, idem)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e)[:100])
+    client.table("topup_intents").update({"xendit_id": inv["id"]}).eq(
+        "idempotency_key", idem
+    ).execute()
+    return {"payUrl": inv["url"], "credits": q["credits"], "fee": q["fee"]}
+
+
+@app.post("/webhooks/xendit")
+async def xendit_webhook(request: Request):
+    if not xenditmod.callback_ok(request.headers.get("x-callback-token", "")):
+        raise HTTPException(status_code=401, detail="unauthorized")
+    body = await request.json()
+    if body.get("status") != "PAID":
+        return {"ok": True}
+    client = supa.service_client()
+    intent = (
+        client.table("topup_intents")
+        .select("*")
+        .eq("xendit_id", body.get("id"))
+        .single()
+        .execute()
+        .data
+    )
+    if not intent:
+        raise HTTPException(status_code=404, detail="intent-tidak-ditemukan")
+    if intent["status"] == "paid":
+        return {"ok": True}
+    balance = creditsmod.balance_of(client, intent["user_id"])
+    credited = client.table("ai_credit_ledger").insert(
+        {
+            "user_id": intent["user_id"],
+            "amount": intent["credits"],
+            "balance_after": balance + intent["credits"],
+            "reason": "topup-xendit",
+            "idempotency_key": f"topup:{intent['idempotency_key']}",
+        }
+    ).execute()
+    if not credited.data:
+        return {"ok": True}
+    client.table("topup_intents").update({"status": "paid"}).eq("id", intent["id"]).execute()
+    return {"ok": True}

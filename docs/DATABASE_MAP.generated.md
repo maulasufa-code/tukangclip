@@ -2,7 +2,7 @@
 
 Dibuat otomatis dari SQL. Jangan edit manual. Jalankan `npm run db:map`.
 
-Migrasi terbaca: 20261015_fase1_profiles_jobs.sql, 20261016_full_platform.sql, 20261018_render_claim.sql
+Migrasi terbaca: 20261015_fase1_profiles_jobs.sql, 20261016_full_platform.sql, 20261018_render_claim.sql, 20261019_credit_topup.sql
 
 Tipe: user_role (20261015_fase1_profiles_jobs.sql), ai_job_status (20261015_fase1_profiles_jobs.sql), submission_status (20261016_full_platform.sql), campaign_status (20261016_full_platform.sql), escrow_status (20261016_full_platform.sql), application_status (20261016_full_platform.sql), payout_status (20261016_full_platform.sql)
 
@@ -259,6 +259,26 @@ Sumber: `20261016_full_platform.sql`
 - constraint posted_check check (
 
 Policy (2): subs_read_party (20261016_full_platform.sql), subs_insert_editor (20261016_full_platform.sql)
+
+## public.topup_intents
+
+Sumber: `20261019_credit_topup.sql`
+
+- id uuid primary key default gen_random_uuid()
+- user_id uuid not null references auth.users (id) on delete cascade
+- amount bigint not null
+- fee bigint not null default 0
+- credits int not null
+- currency text not null default 'IDR'
+- status text not null default 'pending'
+- xendit_id text unique
+- idempotency_key text not null unique
+- created_at timestamptz not null default now()
+- updated_at timestamptz not null default now()
+- constraint topup_pos check (amount > 0 and credits > 0)
+- constraint topup_status check (status in ('pending', 'paid', 'expired', 'failed'))
+
+Policy (1): topup_read_own (20261019_credit_topup.sql)
 
 ## public.view_snapshots
 
