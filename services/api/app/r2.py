@@ -31,3 +31,11 @@ def presigned_put(user_id: str, filename: str, size: int, kind: str = "source") 
         ExpiresIn=config.PRESIGN_TTL,
     )
     return url, key, idem
+
+
+def presigned_get(key: str, ttl: int = 300) -> str:
+    return r2_client().generate_presigned_url(
+        "get_object",
+        Params={"Bucket": config.R2_BUCKET_RAW, "Key": key},
+        ExpiresIn=ttl,
+    )

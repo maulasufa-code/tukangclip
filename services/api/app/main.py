@@ -9,6 +9,7 @@ from .authz import require_role, require_user
 from .schemas import (
     JobCreate,
     JobOut,
+    PayoutAccountCreate,
     PlanOut,
     PlanSave,
     PresignRequest,
@@ -266,3 +267,37 @@ async def xendit_webhook(request: Request):
         return {"ok": True}
     client.table("topup_intents").update({"status": "paid"}).eq("id", intent["id"]).execute()
     return {"ok": True}
+
+
+@app.post("/payout-accounts")
+def save_payout_account(body: PayoutAccountCreate, authorization: str | None = Header(default=None)):
+    from . import crypto as cryptomod
+
+    user_id = require_user(authorization)
+    client = supa.service_client()
+    try:
+        sealed = cryptomod.encrypt(body.accountNumber)
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    client.table("payout_accounts").insert(
+        {
+            "user_id": user_id,
+            "provider": body.provider,
+            "account_ref": sealed,
+            "account_name": body.accountName,
+        }
+    ).execute()
+    return {"ok": True}
+
+
+@app.post("/kyc/{doc_id}/access")
+def kyc_access(doc_id: str, authorization: str | None = Header(default=None)):
+    user_id = require_user(authorization)
+    client = supa.service_client()
+    doc = client.table("kyc_documents").select("*").eq("id", doc_id).single().execute().data
+    if not doc or doc["user_id"] != user_id:
+        raise HTTPException(status_code=404, detail="tidak-ditemukan")
+    client.table("kyc_access_log").insert(
+        {"doc_id": doc_id, "accessor": user_id, "reason": "buka-berkas"}
+    ).execute()
+    return {"url": r2mod.presigned_get(doc["file_r2_key"], 300)}

@@ -43,6 +43,12 @@ class PlanOut(BaseModel):
     version: int
 
 
+class PayoutAccountCreate(BaseModel):
+    provider: str = Field(max_length=40)
+    accountNumber: str = Field(min_length=4, max_length=32)
+    accountName: str = Field(max_length=80)
+
+
 class CampaignCreate(BaseModel):
     title: str = Field(max_length=120)
     brief: str = ""

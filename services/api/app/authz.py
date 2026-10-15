@@ -1,5 +1,8 @@
 from fastapi import Header, HTTPException
 
+import httpx
+
+from . import config
 from . import supabase_client as supa
 
 
@@ -20,3 +23,16 @@ def role_of(client, user_id: str) -> str:
 def require_role(client, user_id: str, roles: list[str]) -> None:
     if role_of(client, user_id) not in roles:
         raise HTTPException(status_code=403, detail="peran-tidak-cukup")
+
+
+def has_verified_mfa(user_id: str) -> bool:
+    r = httpx.get(
+        f"{config.SUPABASE_URL}/auth/v1/admin/users/{user_id}/factors",
+        headers={
+            "apikey": config.SUPABASE_SERVICE_ROLE_KEY,
+            "Authorization": f"Bearer {config.SUPABASE_SERVICE_ROLE_KEY}",
+        },
+        timeout=10,
+    )
+    r.raise_for_status()
+    return any(f.get("status") == "verified" for f in r.json().get("factors", []))

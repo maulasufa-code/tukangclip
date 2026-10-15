@@ -318,6 +318,10 @@ def payout(sid: str, authorization: str | None = Header(default=None)):
         raise HTTPException(status_code=400, detail="belum-tayang")
     if s.get("flagged"):
         raise HTTPException(status_code=400, detail="tersangkut-sengketa")
+    from .authz import has_verified_mfa
+
+    if not has_verified_mfa(a["editor_id"]):
+        raise HTTPException(status_code=403, detail="editor-wajib-2fa")
     sm = settings_map(client)
     hold = int(sm.get("view_hold_days", 7))
     posted_at = datetime.fromisoformat(s["posted_at"])
@@ -356,9 +360,15 @@ def payout(sid: str, authorization: str | None = Header(default=None)):
     )
     if not acct:
         raise HTTPException(status_code=400, detail="rekening-editor-belum-verifikasi")
+    from . import crypto as cryptomod
+
+    try:
+        account_number = cryptomod.decrypt(acct[0]["account_ref"])
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
     try:
         disb = xenditmod.create_disbursement(
-            amount, acct[0]["provider"], acct[0]["account_ref"], acct[0]["account_name"], f"pay:{idem}"
+            amount, acct[0]["provider"], account_number, acct[0]["account_name"], f"pay:{idem}"
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e)[:100])
