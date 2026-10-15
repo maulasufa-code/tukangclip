@@ -7,6 +7,7 @@
     "dev:web": "npm run dev --workspace apps/web",
     "build:web": "npm run build --workspace apps/web",
     "test:e2e": "npm run test:e2e --workspace tests/e2e",
-    "db:map": "node scripts/generate-db-map.mjs"
+    "db:map": "node scripts/generate-db-map.mjs",
+    "db:effects": "node scripts/generate-effects-sql.mjs"
   }
 }

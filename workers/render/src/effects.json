@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "note": "Sumber kebenaran ID efek. LLM hanya boleh pilih id yang ada di sini. Validator membersihkan sisanya.",
+  "effects": [
+    { "id": "sfx_tawa_01", "kind": "sfx", "label": "Tawa pendek", "dur_ms": 1200, "duck_db": -6, "file_r2": null },
+    { "id": "sfx_tepuk_01", "kind": "sfx", "label": "Tepuk tangan", "dur_ms": 1800, "duck_db": -5, "file_r2": null },
+    { "id": "sfx_dramatic_01", "kind": "sfx", "label": "Dramatic hit", "dur_ms": 900, "duck_db": -8, "file_r2": null },
+    { "id": "sfx_pop_01", "kind": "sfx", "label": "Pop ringan", "dur_ms": 400, "duck_db": -3, "file_r2": null },
+    { "id": "stk_ngakak_01", "kind": "sticker", "label": "Stiker ngakak", "dur_ms": 2000, "file_r2": null },
+    { "id": "stk_kaget_01", "kind": "sticker", "label": "Stiker kaget", "dur_ms": 1500, "file_r2": null },
+    { "id": "stk_api_01", "kind": "sticker", "label": "Stiker api", "dur_ms": 2500, "file_r2": null },
+    { "id": "zoom_punch_01", "kind": "zoom", "label": "Punch-in cepat", "dur_ms": 400, "scale": 1.15 },
+    { "id": "zoom_out_01", "kind": "zoom", "label": "Zoom-out lega", "dur_ms": 800, "scale": 1.0 },
+    { "id": "freeze_01", "kind": "freeze", "label": "Freeze punchline", "dur_ms": 800 },
+    { "id": "freeze_zoom_01", "kind": "freeze", "label": "Freeze plus zoom", "dur_ms": 1200, "scale": 1.1 }
+  ]
+}
