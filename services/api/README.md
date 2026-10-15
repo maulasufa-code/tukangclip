@@ -1,13 +1,17 @@
-# Kontrak API (diimplementasi penuh di Fase 2)
+# TukangClip API (FastAPI)
 
-FastAPI menjadi satu-satunya penulis logika uang dan pemegang service role.
+Satu-satunya penulis logika server. Web tidak menghitung saldo atau status.
 
-Kontrak Fase 1 yang dipakai web:
+## Endpoint Fase 2
 
-- `POST /api/r2/presign` (sementara di Next.js, pindah ke FastAPI di Fase 2):
-  input `{filename, bytes, mime}`, output `{uploadUrl, r2Key, idempotencyKey}`.
-- `ai_jobs` ditulis klien hanya saat insert milik sendiri (RLS).
-  Status diubah worker via `claim_next_ai_job()` memakai service role.
+- `GET /health` tanpa auth.
+- `POST /r2/presign` butuh `Authorization: Bearer <supabase-jwt>`. Ganti rute Next.js setelah ini live.
+- `POST /jobs` buat baris `ai_jobs` milik pemanggil via service role.
+- `GET /jobs/{id}` baca milik sendiri.
 
-Aturan: tidak ada kalkulasi saldo di klien. Semua transisi status dan
-ledger dikerjakan di `services/api` mulai Fase 2.
+## Jalan lokal
+
+1. Salin `.env.example` ke `.env`, isi Supabase service role dan R2.
+2. `pip install -r requirements.txt`.
+3. `uvicorn app.main:app --reload --port 8000`.
+4. `pytest tests -q`.
