@@ -8,3 +8,5 @@ supabase/.branches/
 supabase/.temp/
 *.tsbuildinfo
 test-results/
+__pycache__/
+*.pyc
