@@ -14,9 +14,14 @@ export function supabaseServer() {
         setAll(
           toSet: { name: string; value: string; options?: Record<string, unknown> }[]
         ) {
-          toSet.forEach(({ name, value, options }) => {
-            store.set(name, value, options as never);
-          });
+          try {
+            toSet.forEach(({ name, value, options }) => {
+              store.set(name, value, options as never);
+            });
+          } catch {
+            // Tanpa middleware, refresh token yang kedaluwarsa diabaikan di sini.
+            // Klien browser menyegarkan sesi sendiri dan halaman login jadi fallback.
+          }
         }
       }
     }
