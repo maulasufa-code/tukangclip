@@ -16,7 +16,7 @@ from .schemas import (
     PresignResponse,
 )
 
-app = FastAPI(title="TukangClip API", version="0.6.0")
+app = FastAPI(title="TukangClip API", version="0.9.0")
 
 from .marketplace import router as marketplace_router
 from .distribusi import router as distribusi_router
@@ -301,3 +301,11 @@ def kyc_access(doc_id: str, authorization: str | None = Header(default=None)):
         {"doc_id": doc_id, "accessor": user_id, "reason": "buka-berkas"}
     ).execute()
     return {"url": r2mod.presigned_get(doc["file_r2_key"], 300)}
+
+
+import os as _os
+
+if _prefix := _os.environ.get("API_PREFIX", ""):
+    _served = app
+    app = FastAPI(title="TukangClip API")
+    app.mount(_prefix, _served)

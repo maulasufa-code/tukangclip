@@ -1,0 +1,34 @@
+services:
+  api:
+    build: ./services/api
+    env_file: ./services/api/.env
+    environment:
+      API_PREFIX: ""
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  analysis:
+    build: ./workers/analysis
+    env_file: ./services/api/.env
+    environment:
+      WHISPER_MODEL: small
+    restart: unless-stopped
+
+  render:
+    build: ./workers/render
+    env_file: ./services/api/.env
+    restart: unless-stopped
+
+  tracker:
+    build:
+      context: ./workers/tracker
+      dockerfile_inline: |
+        FROM python:3.11-slim
+        WORKDIR /srv
+        COPY requirements.txt .
+        RUN pip install --no-cache-dir -r requirements.txt
+        COPY worker.py .
+        CMD ["python", "worker.py"]
+    env_file: ./services/api/.env
+    restart: unless-stopped
