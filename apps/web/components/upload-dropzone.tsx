@@ -26,9 +26,14 @@ export function UploadDropzone() {
     }
     try {
       setFase("minta-url");
+      const supabaseAwal = supabaseBrowser();
+      const { data: sesi } = await supabaseAwal.auth.getSession();
       const presign = await fetch("/api/r2/presign", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${sesi.session?.access_token ?? ""}`
+        },
         body: JSON.stringify({
           filename: file.name,
           bytes: file.size,
