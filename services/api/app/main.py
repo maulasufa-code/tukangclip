@@ -309,3 +309,14 @@ if _prefix := _os.environ.get("API_PREFIX", ""):
     _served = app
     app = FastAPI(title="TukangClip API")
     app.mount(_prefix, _served)
+
+from fastapi.middleware.cors import CORSMiddleware
+
+_origins = [o.strip() for o in _os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_origins or ["http://localhost:3000", "https://tukangclip.vercel.app"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
