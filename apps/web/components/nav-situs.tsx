@@ -12,11 +12,11 @@ const tautan = [
 ];
 
 const gayaTautan =
-  "inline-flex min-h-[44px] items-center rounded-md px-3 text-sm text-teks-lembut transition-colors hover:text-teks";
+  "inline-flex min-h-[44px] items-center rounded-md px-3 text-sm text-cb-tinta-lembut transition-colors duration-200 hover:text-cb-tinta";
 const gayaTombolKuning =
-  "min-h-[44px] inline-flex items-center justify-center rounded-md bg-kuning px-4 text-sm font-semibold text-kuning-tinta transition-colors hover:bg-kuning-tekan";
+  "min-h-[44px] inline-flex items-center justify-center rounded-md bg-kuning px-4 text-sm font-semibold text-kuning-tinta transition-colors duration-200 hover:bg-kuning-tekan";
 const gayaTombolGaris =
-  "min-h-[44px] inline-flex items-center justify-center rounded-md border border-garis-terang px-4 text-sm font-medium text-teks transition-colors hover:border-teks";
+  "min-h-[44px] inline-flex items-center justify-center rounded-md bg-cb-kabut px-4 text-sm font-medium text-cb-tinta transition-colors duration-200 hover:bg-cb-garis";
 
 export function NavSitus() {
   const [terbuka, setTerbuka] = useState(false);
@@ -36,9 +36,9 @@ export function NavSitus() {
   }, [terbuka]);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-garis bg-arang">
+    <header className="sticky top-0 z-40 border-b border-cb-garis bg-cb-kertas">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-3">
-        <a href="/" className="flex items-center gap-2.5 py-1">
+        <a href="/" className="flex min-h-[44px] items-center gap-2.5">
           <Image
             src="/marka-tukangclip.png"
             alt=""
@@ -48,7 +48,7 @@ export function NavSitus() {
             unoptimized
             className="h-6 w-auto"
           />
-          <span className="text-base font-extrabold tracking-tight text-teks">
+          <span className="font-cb-headline text-base font-semibold tracking-tight text-cb-tinta">
             TukangClip
           </span>
         </a>
@@ -75,7 +75,7 @@ export function NavSitus() {
             aria-expanded={terbuka}
             aria-controls="menu-situs"
             aria-label={terbuka ? "Tutup menu" : "Buka menu"}
-            className="inline-flex h-11 items-center gap-1.5 rounded-md bg-permukaan px-3 text-sm text-teks lg:hidden"
+            className="inline-flex h-11 items-center gap-1.5 rounded-md bg-cb-kabut px-3 text-sm text-cb-tinta lg:hidden"
           >
             <IkonMenu terbuka={terbuka} />
             <span>{terbuka ? "Tutup" : "Menu"}</span>
@@ -87,7 +87,7 @@ export function NavSitus() {
         <nav
           id="menu-situs"
           aria-label="Bagian halaman"
-          className="border-t border-garis bg-arang lg:hidden"
+          className="border-t border-cb-garis bg-cb-kertas lg:hidden"
         >
           <ul className="mx-auto max-w-6xl px-5 py-2">
             {tautan.map((t) => (
@@ -95,13 +95,13 @@ export function NavSitus() {
                 <a
                   href={t.href}
                   onClick={() => setTerbuka(false)}
-                  className="flex min-h-[44px] items-center text-sm text-teks-lembut"
+                  className="flex min-h-[44px] items-center text-sm text-cb-tinta-lembut"
                 >
                   {t.label}
                 </a>
               </li>
             ))}
-            <li className="mt-2 flex flex-wrap gap-2 border-t border-garis pt-4 pb-2 sm:hidden">
+            <li className="mt-2 flex flex-wrap gap-2 border-t border-cb-garis pt-4 pb-2 sm:hidden">
               <a href="/masuk" className={gayaTombolGaris}>
                 Masuk
               </a>
