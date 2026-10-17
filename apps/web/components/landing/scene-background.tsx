@@ -4,8 +4,11 @@ import { useEffect, useRef } from "react";
 
 /**
  * Latar 3D dengan Three.js. Pakai WebGPURenderer, yang otomatis turun ke
- * backend WebGL 2 saat WebGPU tidak tersedia. Pola titik di atas gelap dan
- * kotak merah muda yang mengikuti kursor digambar di kanvas 2D terpisah.
+ * backend WebGL 2 saat WebGPU tidak tersedia. Isinya roll film gulung yang
+ * terpotong: muka potong spiral berputar pelan, ekor film bersprocket mengalir
+ * keluar dan berakhir di potongan diagonal. Irisan roll di depan bergerak lebih
+ * cepat saat scroll untuk parallax. Pola titik di atas gelap dan kotak merah
+ * muda yang mengikuti kursor digambar di kanvas 2D terpisah.
  */
 export function SceneBackground() {
   const kanvasGl = useRef<HTMLCanvasElement>(null);
@@ -16,7 +19,9 @@ export function SceneBackground() {
     const dc = kanvasTitik.current;
     if (!cv || !dc) return;
 
-    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // ?gerak di URL mengabaikan preferensi OS, untuk melihat animasi di mesin yang mematikan animasi.
+    const reduce =
+      matchMedia("(prefers-reduced-motion: reduce)").matches && !new URLSearchParams(location.search).has("gerak");
     const dx = dc.getContext("2d");
     if (!dx) return;
 
@@ -115,131 +120,199 @@ export function SceneBackground() {
 
       const scene = new THREE.Scene();
       const kamera = new THREE.PerspectiveCamera(30, 1, 10, 6000);
-      scene.add(new THREE.AmbientLight(0x3a0d36, 0.8));
-      const lampu = new THREE.DirectionalLight(0xff5fae, 0.85);
+      scene.add(new THREE.AmbientLight(0x6a2a66, 1.1));
+      const lampu = new THREE.DirectionalLight(0xff5fae, 1.5);
       lampu.position.set(-500, 600, 700);
       scene.add(lampu);
-      const titikCahaya = new THREE.PointLight(0xffb8dc, 0.6, 0);
+      const titikCahaya = new THREE.PointLight(0xffb8dc, 1.2, 0);
       titikCahaya.position.set(500, 350, 600);
       scene.add(titikCahaya);
-      const rim = new THREE.DirectionalLight(0x8a2cff, 0.5);
+      const rim = new THREE.DirectionalLight(0x8a2cff, 0.9);
       rim.position.set(300, -200, -400);
       scene.add(rim);
 
-      const bahan = (c: number, e?: number) =>
-        new THREE.MeshPhysicalMaterial({
-          color: c,
-          roughness: 0.38,
-          metalness: 0.12,
-          clearcoat: 0.6,
-          clearcoatRoughness: 0.3,
-          emissive: e ?? 0x0c020b,
-          side: THREE.DoubleSide
-        });
+      // Ukuran roll dalam satuan lokal: lebar film, tebal satu lapis, jarak antar lapis.
+      const LEBAR = 200;
+      const TEBAL = 10;
+      const JARAK = 24;
+      const R0 = 64;
+      const PUTAR = 9;
+      const R_CINCIN = R0 + JARAK * PUTAR + 22;
 
-      function pita(ro: number, ri: number, a0: number, a1: number, d: number, m: InstanceType<typeof THREE.MeshPhysicalMaterial> | InstanceType<typeof THREE.MeshBasicMaterial>) {
-        const s = new THREE.Shape();
-        s.absarc(0, 0, ro, a0, a1, false);
-        s.absarc(0, 0, ri, a1, a0, true);
-        s.closePath();
-        const g = new THREE.ExtrudeGeometry(s, {
-          depth: d,
-          bevelEnabled: true,
-          bevelThickness: 6,
-          bevelSize: 6,
-          bevelSegments: 4,
-          curveSegments: 120
-        });
-        g.translate(0, 0, -d / 2);
-        return new THREE.Mesh(g, m);
+      const polar = (r: number, a: number) => [r * Math.cos(a), r * Math.sin(a)];
+
+      function spiral() {
+        const o: number[][] = [];
+        const i: number[][] = [];
+        const n = Math.ceil((PUTAR * 2 * Math.PI) / 0.09);
+        for (let k = 0; k <= n; k++) {
+          const th = (k / n) * PUTAR * 2 * Math.PI;
+          const r = R0 + (JARAK * th) / (2 * Math.PI);
+          o.push(polar(r + TEBAL / 2, th));
+          i.push(polar(r - TEBAL / 2, th));
+        }
+        return { o, i };
       }
 
-      const putih = new THREE.MeshBasicMaterial({ color: 0xffffff });
-      const cahaya = new THREE.MeshBasicMaterial({
-        color: 0xff4fa0,
-        transparent: true,
-        opacity: 0.28,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false
+      function lingkaran(r: number) {
+        const o: number[][] = [];
+        const i: number[][] = [];
+        const n = 180;
+        for (let k = 0; k <= n; k++) {
+          const a = (k / n) * 2 * Math.PI;
+          o.push(polar(r + TEBAL / 2, a));
+          i.push(polar(r - TEBAL / 2, a));
+        }
+        return { o, i };
+      }
+
+      // Pita tipis dari dua polyline, jadi muka potong (caps) dan sisi (walls).
+      function padat(o: number[][], i: number[][], d: number, tertutup: boolean) {
+        const h = d / 2;
+        const P = (p: number[], z: number) => [p[0], p[1], z];
+        const caps: number[] = [];
+        const walls: number[] = [];
+        const quad = (out: number[], a: number[], b: number[], c: number[], e: number[]) =>
+          out.push(...a, ...b, ...c, ...a, ...c, ...e);
+        for (let k = 0; k < o.length - 1; k++) {
+          quad(caps, P(o[k], h), P(i[k], h), P(i[k + 1], h), P(o[k + 1], h));
+          quad(caps, P(o[k], -h), P(i[k], -h), P(i[k + 1], -h), P(o[k + 1], -h));
+          quad(walls, P(o[k], h), P(o[k + 1], h), P(o[k + 1], -h), P(o[k], -h));
+          quad(walls, P(i[k], h), P(i[k + 1], h), P(i[k + 1], -h), P(i[k], -h));
+        }
+        if (!tertutup) {
+          const e = o.length - 1;
+          quad(walls, P(o[0], h), P(i[0], h), P(i[0], -h), P(o[0], -h));
+          quad(walls, P(o[e], h), P(i[e], h), P(i[e], -h), P(o[e], -h));
+        }
+        const buat = (arr: number[]) => {
+          const g = new THREE.BufferGeometry();
+          g.setAttribute("position", new THREE.Float32BufferAttribute(arr, 3));
+          g.computeVertexNormals();
+          return g;
+        };
+        return { caps: buat(caps), walls: buat(walls) };
+      }
+
+      const bahanPotong = new THREE.MeshPhysicalMaterial({
+        color: 0x9a2a86,
+        emissive: 0x3a0c36,
+        roughness: 0.42,
+        metalness: 0.05,
+        clearcoat: 0.5,
+        side: THREE.DoubleSide
+      });
+      const bahanSisi = new THREE.MeshPhysicalMaterial({
+        color: 0x241028,
+        emissive: 0x0e0410,
+        roughness: 0.5,
+        metalness: 0.3,
+        clearcoat: 0.4,
+        side: THREE.DoubleSide
       });
 
-      function sorotan(r: number, w: number, a: number, span: number) {
+      function irisan(o: number[][], i: number[][], d: number, tertutup: boolean) {
+        const { caps, walls } = padat(o, i, d, tertutup);
         const g = new THREE.Group();
-        g.add(pita(r + w / 2, r - w / 2, a, a + span, 4, putih));
-        g.add(pita(r + w * 3, r - w * 3, a, a + span, 4, cahaya));
+        g.add(new THREE.Mesh(caps, bahanPotong), new THREE.Mesh(walls, bahanSisi));
         return g;
       }
 
-      function riben() {
-        const g = new THREE.Group();
-        const A = pita(640, 500, 0.1 * Math.PI, 0.9 * Math.PI, 300, bahan(0x34102f));
-        A.position.set(-380, 0, -160);
-        A.rotation.z = 0.12;
-        g.add(A);
-        const B = pita(600, 470, 0.08 * Math.PI, 0.93 * Math.PI, 260, bahan(0x5a1853));
-        B.position.set(260, -40, -60);
-        B.rotation.z = -0.1;
-        g.add(B);
-        const C = pita(520, 390, 0.12 * Math.PI, 0.88 * Math.PI, 240, bahan(0x7a2070, 0x1a0618));
-        C.position.set(30, -120, 140);
-        C.rotation.z = 0.05;
-        g.add(C);
-        const S = sorotan(460, 5, 0.3 * Math.PI, 0.22 * Math.PI);
-        S.position.set(30, -120, 268);
-        g.add(S);
-        g.userData.s = S;
-        g.rotation.x = -0.28;
-        return g;
+      // Kain film: lubang sprocket di dua tepi, bingkai di tengah.
+      const PANJANG_UBIN = 2 * LEBAR;
+      function tekstur() {
+        const c = document.createElement("canvas");
+        c.width = 512;
+        c.height = 256;
+        const g = c.getContext("2d")!;
+        g.fillStyle = "#1c0f20";
+        g.fillRect(0, 0, 512, 256);
+        const gr = g.createLinearGradient(0, 0, 512, 0);
+        gr.addColorStop(0, "#43163f");
+        gr.addColorStop(1, "#7a2370");
+        g.fillStyle = gr;
+        g.fillRect(24, 48, 464, 160);
+        g.fillStyle = "#1c0f20";
+        g.fillRect(250, 48, 12, 160);
+        for (let k = 0; k < 8; k++) {
+          g.clearRect(10 + k * 64, 12, 30, 20);
+          g.clearRect(10 + k * 64, 224, 30, 20);
+        }
+        const t = new THREE.CanvasTexture(c);
+        t.wrapS = THREE.RepeatWrapping;
+        t.colorSpace = THREE.SRGBColorSpace;
+        return t;
+      }
+      const ubin = tekstur();
+      const bahanFilm = new THREE.MeshStandardMaterial({
+        map: ubin,
+        alphaTest: 0.5,
+        roughness: 0.55,
+        metalness: 0.1,
+        emissive: 0x2a0c2a,
+        side: THREE.DoubleSide
+      });
+
+      // Ekor film: keluar dari puncak cincin, melengkung ke kiri, dan putus miring.
+      function ekor() {
+        const lengkung = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(0, R_CINCIN, 0),
+          new THREE.Vector3(-170, R_CINCIN + 6, 0),
+          new THREE.Vector3(-340, R_CINCIN - 28, 0),
+          new THREE.Vector3(-480, R_CINCIN - 100, 0),
+          new THREE.Vector3(-570, R_CINCIN - 200, 0)
+        ]);
+        const panjang = lengkung.getLength();
+        const N = 90;
+        const pos: number[] = [];
+        const uv: number[] = [];
+        const idx: number[] = [];
+        for (let k = 0; k <= N; k++) {
+          const tl = k / N;
+          const tr = k === N ? 1 - 0.18 : tl;
+          const pl = lengkung.getPointAt(tl);
+          const pr = lengkung.getPointAt(tr);
+          pos.push(pl.x, pl.y, -LEBAR / 2, pr.x, pr.y, LEBAR / 2);
+          uv.push((tl * panjang) / PANJANG_UBIN, 0, (tr * panjang) / PANJANG_UBIN, 1);
+          if (k < N) {
+            const a = 2 * k;
+            idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
+          }
+        }
+        const g = new THREE.BufferGeometry();
+        g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+        g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+        g.setIndex(idx);
+        g.computeVertexNormals();
+        return new THREE.Mesh(g, bahanFilm);
       }
 
-      const hero = riben();
-      const kaki = riben();
-      scene.add(hero, kaki);
+      // Roll utama: cincin diam + spiral yang berputar + ekor.
+      const roll = new THREE.Group();
+      const putarRoll = new THREE.Group();
+      const sp = spiral();
+      putarRoll.add(irisan(sp.o, sp.i, LEBAR - 6, false));
+      roll.add(putarRoll);
+      const ring = lingkaran(R_CINCIN);
+      roll.add(irisan(ring.o, ring.i, LEBAR, true));
+      roll.add(ekor());
+      scene.add(roll);
 
-      // Bola kaca dengan riben di dalamnya.
-      const bola = new THREE.Group();
-      const inti = new THREE.Group();
-      bola.add(inti);
-      // Material fisik, bukan ShaderMaterial GLSL, supaya tetap jalan di backend WebGPU.
-      const kulit = new THREE.MeshPhysicalMaterial({
-        color: 0xff4fa0,
-        emissive: 0x3a0830,
-        roughness: 0.15,
-        metalness: 0,
-        clearcoat: 1,
-        transparent: true,
-        opacity: 0.22,
-        depthWrite: false,
-        side: THREE.BackSide
-      });
-      bola.add(new THREE.Mesh(new THREE.SphereGeometry(300, 64, 48), kulit));
-      const cfg: [number, number, number, number, number, number, number, number, number][] = [
-        [250, 170, 0.0, 1.55, 120, 0.9, 0, 0.2, 0x4a1048],
-        [230, 150, 0.3, 1.9, 110, 0, 0.8, -0.4, 0x6a1860],
-        [200, 120, 1.6, 2.8, 140, 0.3, 0.2, 0.9, 0x8c2380],
-        [170, 100, 0.1, 1.4, 100, 1.1, -0.6, 0.1, 0x5a1553],
-        [140, 80, 2.2, 3.6, 90, -0.5, 0.4, 1.3, 0x9c2a8f]
-      ];
-      cfg.forEach((c) => {
-        const m = pita(c[0], c[1], c[2], c[3], c[4], bahan(c[8]));
-        m.rotation.set(c[5], c[6], c[7]);
-        inti.add(m);
-      });
-      const sorotanBola = sorotan(214, 4, 0, 0.8);
-      sorotanBola.rotation.set(0.9, 0.2, 0.1);
-      inti.add(sorotanBola);
-      scene.add(bola);
+      // Irisan yang terpisah dari roll, lebih dekat ke kamera.
+      const potong = new THREE.Group();
+      const putarPotong = new THREE.Group();
+      const sp2 = spiral();
+      putarPotong.add(irisan(sp2.o, sp2.i, 46, false));
+      potong.add(putarPotong);
+      scene.add(potong);
 
       let mxn = 0;
       let myn = 0;
-      window.addEventListener(
-        "pointermove",
-        (e) => {
-          mxn = e.clientX / window.innerWidth - 0.5;
-          myn = e.clientY / window.innerHeight - 0.5;
-        },
-        { passive: true }
-      );
+      const padaKursor = (e: PointerEvent) => {
+        mxn = e.clientX / window.innerWidth - 0.5;
+        myn = e.clientY / window.innerHeight - 0.5;
+      };
+      window.addEventListener("pointermove", padaKursor, { passive: true });
 
       function ukuranTiga() {
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -251,24 +324,39 @@ export function SceneBackground() {
       ukuranTiga();
       window.addEventListener("resize", ukuranTiga);
 
+      let gulirHalus = window.scrollY;
+      let putar = 0;
+      let tAwal = 0;
+
+      const mod = (a: number, b: number) => ((a % b) + b) % b;
+
       function bingkai(t: number) {
-        const skala = Math.max(0.42, Math.min(1, window.innerWidth / 1400));
-        const gulir = window.scrollY * 0.0002;
-        hero.position.set(-window.innerWidth * 0.3, -window.innerHeight * 0.1, 0);
-        hero.scale.setScalar(skala * 0.72);
-        hero.rotation.set(-0.28 + myn * 0.06, -0.5 + mxn * 0.12 + gulir, 0);
-        kaki.position.set(window.innerWidth * 0.3, -window.innerHeight * 0.5, 0);
-        kaki.scale.setScalar(skala * 0.72);
-        kaki.rotation.set(-0.28 + myn * 0.05, -0.55 + mxn * 0.1, 0);
-        bola.position.set(0, -window.innerHeight * 0.1, 0);
-        bola.scale.setScalar(Math.min(window.innerWidth * 0.3, window.innerHeight * 0.42, 300) / 300);
-        bola.rotation.set(myn * 0.3, t * 0.00012 + mxn * 0.4, 0);
-        inti.rotation.set(0, t * 0.0001, t * 0.00018);
-        sorotanBola.rotation.z = t * 0.0007;
-        [hero, kaki].forEach((g, i) => {
-          const p = (t * 0.00011 + i * 0.5) % 1;
-          g.userData.s.rotation.z = -(0.08 + p * 0.5) * (Math.PI / 2);
-        });
+        const dt = tAwal ? Math.min((t - tAwal) / 1000, 0.05) : 0;
+        tAwal = t;
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        const skala = Math.max(0.3, Math.min(1.3, Math.min(w * 0.24, h * 0.3) / R_CINCIN));
+
+        const sebelum = gulirHalus;
+        gulirHalus = reduce ? 0 : gulirHalus + (window.scrollY - gulirHalus) * Math.min(1, dt * 7);
+        const kecepatan = dt ? Math.abs(gulirHalus - sebelum) / dt : 0;
+        const laju = 0.16 + Math.min(kecepatan, 3000) * 0.0006;
+        putar += dt * laju;
+
+        // Roll jauh: naik pelan, miring mengikuti scroll.
+        roll.position.set(w * 0.14, h * 0.15 + gulirHalus * 0.2, -150);
+        roll.scale.setScalar(skala);
+        roll.rotation.set(0.42 + myn * 0.06 + gulirHalus * 0.00012, -0.55 + mxn * 0.1 + gulirHalus * 0.0002, 0.04);
+        putarRoll.rotation.z = putar;
+        ubin.offset.x -= (dt * laju * R_CINCIN) / PANJANG_UBIN;
+
+        // Irisan dekat: melintas lebih cepat dan berulang tiap beberapa layar.
+        const rentang = h + skala * 700;
+        const y = mod(-h * 0.2 + gulirHalus * 0.55, rentang) - rentang / 2;
+        potong.position.set(w * 0.3 * Math.cos(gulirHalus * 0.0016 + 1), y, 260);
+        potong.scale.setScalar(skala * 0.8);
+        potong.rotation.set(0.55 + myn * 0.1, 0.5 + mxn * 0.16, -0.3 + gulirHalus * 0.0004);
+        putarPotong.rotation.z = putar * 1.2 + 1;
       }
 
       function gambar(t: number) {
@@ -286,6 +374,7 @@ export function SceneBackground() {
         renderer.setAnimationLoop(null);
         renderer.dispose();
         window.removeEventListener("resize", ukuranTiga);
+        window.removeEventListener("pointermove", padaKursor);
       };
     }
 

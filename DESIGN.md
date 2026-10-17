@@ -44,7 +44,10 @@ Audiensnya orang Indonesia yang bekerja dengan video setiap hari, bukan pembeli 
 - Headline besar dengan bobot tipis (300) dan tracking rapat.
 - Section gelap dan terang bergantian, dengan panel terang yang menimpa section gelap di tepinya.
 - Satu aksen merah muda (`#ff488b`), dipakai hemat di tombol utama, kata penekan judul, dan penanda.
-- Latar 3D berupa riben dan bola kaca yang bergerak pelan. Kursor memengaruhi rotasinya.
+- Latar 3D berupa roll film gulung yang terpotong: muka potong spiral berputar pelan, ekor film bersprocket
+  mengalir keluar dan berakhir di potongan diagonal, dan satu irisan roll melintas di depan. Alasan: film adalah
+  bahan baku produk (video dipotong jadi klip). Kursor memengaruhi rotasinya, dan scroll menggeser roll
+  (jauh) lebih lambat dari irisan (dekat) untuk parallax.
 - Gerak: judul naik per kata, blok masuk saat scroll, dan animasi hover. Semuanya berhenti saat
   `prefers-reduced-motion` aktif.
 
