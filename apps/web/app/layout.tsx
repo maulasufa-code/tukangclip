@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Archivo, Inter, Inter_Tight, JetBrains_Mono } from "next/font/google";
+import { Archivo, DM_Mono, Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
 
 const archivo = Archivo({
@@ -9,25 +9,18 @@ const archivo = Archivo({
   variable: "--font-archivo"
 });
 
-const interTight = Inter_Tight({
+const display = Hanken_Grotesk({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
+  weight: ["300", "400", "500"],
   display: "swap",
-  variable: "--font-inter-tight"
+  variable: "--font-display"
 });
 
-const inter = Inter({
+const mono = DM_Mono({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500"],
   display: "swap",
-  variable: "--font-inter"
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  weight: ["400"],
-  display: "swap",
-  variable: "--font-mono-cb"
+  variable: "--font-mono"
 });
 
 export const metadata: Metadata = {
@@ -41,10 +34,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html
-      lang="id"
-      className={`${archivo.variable} ${interTight.variable} ${inter.variable} ${jetbrainsMono.variable}`}
-    >
+    <html lang="id" className={`${archivo.variable} ${display.variable} ${mono.variable}`}>
       <body className="min-h-screen bg-kertas text-tinta antialiased">
         <a
           href="#isi"

@@ -1,487 +1,335 @@
-import { NavSitus } from "@/components/nav-situs";
-import { Ungkap } from "@/components/ungkap";
+import Link from "next/link";
+import { HeaderNav } from "@/components/landing/header-nav";
+import { Reveal } from "@/components/landing/reveal";
+import { SceneBackground } from "@/components/landing/scene-background";
+import { StepList } from "@/components/landing/step-list";
+import { HighlightMap, LogJob, RoleCards, ViewsChart } from "@/components/landing/widgets";
+import { Words } from "@/components/landing/words";
 
-const langkah = [
-  {
-    nama: "Unggah",
-    isi: "Pilih berkas MP4 sampai 2 GB. Browser mengirimnya langsung ke penyimpanan, jadi videonya tidak mampir ke server web."
-  },
-  {
-    nama: "Analisis",
-    isi: "Worker memecah video jadi beberapa momen, menandai hook tiap momen, dan menyiapkan judul untuk YouTube dan TikTok."
-  },
-  {
-    nama: "Sunting",
-    isi: "Di Studio kamu geser titik mulai dan akhir, tempel efek di beat tertentu, lalu rapikan judul dan hashtag."
-  },
-  {
-    nama: "Render",
-    isi: "Versi yang kamu simpan masuk antrean render. Keluarannya klip vertikal yang siap kamu unggah."
-  }
-];
+const langkah = ["Unggah video panjang", "Analisis mencari momen", "Sunting di Studio", "Render klip vertikal"];
 
-const jalurInstan = [
-  "Analisis jalan di antrean, statusnya bisa kamu pantau di dasbor",
-  "Video sumber tetap di penyimpananmu, begitu juga klip hasilnya",
-  "Hasilnya masuk Studio, tiap momen masih bisa digeser dan diberi efek",
-  "Biayanya 1 kredit untuk 1 video, dipotong dari saldo kreditmu"
-];
-
-const jalurOrganic = [
-  "Budget dikunci sebagai escrow selama kampanye berjalan",
-  "Editor melamar dari pasar, maksimal 3 proyek aktif per editor",
-  "Hasil dikirim sebelum tenggat 72 jam sejak lamaran diterima",
-  "Bayaran dihitung per 1.000 views, dengan batas per klip"
-];
-
-const momenContoh = [
-  { nama: "momen 1", isi: "mulai, akhir, hook" },
-  { nama: "momen 2", isi: "efek per beat" },
-  { nama: "momen 3", isi: "judul dan hashtag" }
-];
-
-const kolomEditPlan = [
-  { istilah: "mulai, akhir", arti: "titik potong tiap momen" },
-  { istilah: "hook", arti: "kalimat pembuka klip" },
-  { istilah: "efek per beat", arti: "efek yang ditempel di beat tertentu" },
-  { istilah: "judul", arti: "versi YouTube dan TikTok, plus hashtag" },
-  { istilah: "versi", arti: "tiap penyimpanan membuat versi baru" }
-];
-
-const jagaData = [
-  {
-    istilah: "Verifikasi dua langkah",
-    arti: "Bisa kamu nyalakan dari halaman keamanan untuk akun yang memegang saldo kredit dan rekening pencairan."
-  },
-  {
-    istilah: "Rekening pencairan",
-    arti: "Nomor rekening disimpan terenkripsi di server. Mengganti rekening akan mereset status verifikasinya."
-  },
-  {
-    istilah: "Pemisahan data",
-    arti: "Setiap baris data dijaga row level security, jadi baris milik orang lain tidak bisa dibaca dari sisi klien."
-  }
-];
-
-const sisiKreator = [
-  "Unggah video panjang dan pantau antrean analisisnya",
-  "Tulis brief kampanye, lalu kunci budgetnya di escrow",
-  "Sambungkan akun supaya views klip terbaca dari akunmu sendiri",
-  "Tutup kampanye saat hasilnya sudah kamu terima"
-];
-
-const sisiEditor = [
-  "Cari proyek di pasar dan kirim lamaran",
-  "Kerjakan potongannya di Studio",
-  "Kirim hasil sebelum tenggat 72 jam",
-  "Simpan rekening pencairan, dibayar per 1.000 views"
+const fakta = [
+  "Unggah MP4 sampai 2 GB",
+  "Sampai 30 menit per video",
+  "Judul untuk YouTube dan TikTok",
+  "1 kredit per video"
 ];
 
 const statusRilis = [
-  "Sudah jalan: daftar akun, verifikasi email, unggah berkas langsung ke penyimpanan, dan antrean job di dasbor.",
-  "Menyusul: analisis dan render otomatis, plus API backend untuk pasar, kredit, dan studio.",
-  "Menyusul: gerak uang nyata lewat Xendit. Dana kampanye sekarang masih dicatat sebagai escrow.",
-  "Menyusul: penyambungan akun TikTok yang masih menunggu verifikasi dari pihak TikTok."
+  { label: "Sudah jalan", isi: "Daftar akun, verifikasi email, unggah langsung ke penyimpanan, dan antrean job di dasbor." },
+  { label: "Menyusul", isi: "Analisis dan render otomatis, plus API backend untuk pasar, kredit, dan studio." },
+  { label: "Menyusul", isi: "Gerak uang nyata lewat Xendit, dan penyambungan akun TikTok yang menunggu verifikasi." }
 ];
 
-const tautanKaki = [
-  { href: "/pasar", label: "Pasar proyek" },
-  { href: "/kredit", label: "Kredit AI" },
-  { href: "/akun", label: "Akun sosial" },
-  { href: "/keamanan", label: "Keamanan" },
-  { href: "/masuk", label: "Masuk" },
-  { href: "/daftar", label: "Buat akun" }
-];
+// Kelas tombol disatukan supaya primer dan sekunder sama di terang maupun gelap.
+const tombolPrimer =
+  "inline-flex min-h-[44px] items-center justify-center rounded-md bg-cl-accent px-6 font-mono text-xs uppercase text-cl-accent-ink transition-[transform,background-color] duration-200 hover:-translate-y-0.5 hover:bg-cl-accent-hi";
+const tombolSekunder =
+  "inline-flex min-h-[44px] items-center justify-center rounded-md bg-white/10 px-6 font-mono text-xs uppercase text-white transition-[transform,background-color] duration-200 hover:-translate-y-0.5 hover:bg-white/20";
 
-// Kelas tombol dipisah supaya primer dan sekunder selalu sama di terang maupun gelap.
-const gayaPrimer =
-  "min-h-[44px] inline-flex items-center justify-center rounded-md bg-kuning px-6 text-sm font-semibold text-kuning-tinta transition-colors duration-200 hover:bg-kuning-tekan";
-const gayaSekunderGelap =
-  "min-h-[44px] inline-flex items-center justify-center rounded-md border border-cb-garis-gelap px-6 text-sm font-medium text-white transition-colors duration-200 hover:border-cb-malam-lembut hover:bg-cb-garis-gelap";
-
-export default function Home() {
+export default function Beranda() {
   return (
-    <div className="min-h-screen bg-cb-kertas font-cb-body text-cb-tinta">
-      {/* Tanpa JS, isi section harus tetap terlihat. */}
-      <noscript
-        dangerouslySetInnerHTML={{
-          __html: ".ungkap{opacity:1 !important;transform:none !important}"
-        }}
-      />
-      <NavSitus />
+    <>
+      <SceneBackground />
+      <HeaderNav />
 
-      <main id="isi">
-        {/* RHYTHM 3: gelap, terang, kabut, gelap, terang, kabut, terang, gelap. */}
-        <section className="gelap bg-cb-malam text-white" aria-labelledby="judul-utama">
-          <div className="mx-auto max-w-6xl px-5 pb-16 pt-14 sm:pb-24 sm:pt-24">
-            <div className="hero-masuk">
+      <main id="isi" className="relative z-[1]">
+        {/* Hero */}
+        <section aria-labelledby="judul-utama" className="gelap relative flex min-h-[max(760px,100svh)] items-end pb-[90px] pt-[140px] text-white max-[980px]:pb-[70px]">
+          <div className="mx-auto grid w-full max-w-[1320px] items-end gap-12 px-4 sm:px-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,3.4fr)]">
+            <Reveal kata>
               <h1
                 id="judul-utama"
-                className="font-cb-headline max-w-4xl text-[44px] font-light leading-[1.02] tracking-[-0.025em] sm:text-[60px] lg:text-[72px]"
+                className="m-0 text-[clamp(46px,7.6vw,112px)] font-light leading-[0.98] tracking-[-0.04em] text-balance"
               >
-                Potong video panjang jadi klip vertikal yang siap tayang
+                <Words text="Video panjang masuk. Klip siap tayang keluar." aksen="siap tayang" />
               </h1>
-              <p className="mt-7 max-w-2xl text-base leading-[1.4] text-cb-malam-lembut sm:text-[17px]">
-                Dua cara mengerjakannya. Biarkan analisis otomatis yang mencari
-                momennya, atau buka kampanye dan biarkan editor yang memotong.
-                Videonya tetap di penyimpananmu dan progresnya bisa kamu pantau.
-              </p>
-              <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <a href="/unggah" className={gayaPrimer}>
-                  Unggah video panjang
-                </a>
-                <a href="/pasar" className={gayaSekunderGelap}>
-                  Lihat pasar proyek
-                </a>
-              </div>
-            </div>
-
-            <dl className="mt-16 grid gap-x-8 gap-y-8 border-t border-cb-garis-gelap pt-8 sm:grid-cols-2 lg:grid-cols-3">
+            </Reveal>
+            <Reveal delay={0.5}>
               <div>
-                <dt className="font-cb-mono text-[13px] text-cb-malam-lembut">Berkas</dt>
-                <dd className="mt-2 font-cb-body tabular-nums">
-                  MP4 sampai 2 GB, dikirim langsung ke penyimpanan
-                </dd>
+                <p className="mb-6 max-w-[36ch] text-[17px] leading-normal tracking-[0.01em] text-[#eadff2]">
+                  Dua cara mengerjakannya. Biarkan analisis otomatis mencari momennya, atau buka kampanye dan
+                  biarkan editor yang memotong. Videomu tetap di penyimpananmu.
+                </p>
+                <div className="flex flex-wrap gap-2.5">
+                  <Link href="/unggah" className={tombolPrimer}>
+                    Unggah video panjang
+                  </Link>
+                  <Link href="/pasar" className={tombolSekunder}>
+                    Lihat pasar proyek
+                  </Link>
+                </div>
               </div>
-              <div>
-                <dt className="font-cb-mono text-[13px] text-cb-malam-lembut">Durasi</dt>
-                <dd className="mt-2 font-cb-body tabular-nums">
-                  Sampai 30 menit per video
-                </dd>
-              </div>
-              <div>
-                <dt className="font-cb-mono text-[13px] text-cb-malam-lembut">Jalur instan</dt>
-                <dd className="mt-2 font-cb-body tabular-nums">1 kredit untuk 1 video</dd>
-              </div>
-            </dl>
+            </Reveal>
           </div>
+          <a
+            href="#marquee"
+            className="absolute bottom-7 left-4 flex min-h-[44px] items-center gap-2.5 font-mono text-[11px] uppercase text-cl-muted sm:left-6"
+          >
+            Gulir <span aria-hidden="true">↓</span>
+          </a>
         </section>
 
+        {/* Fakta berjalan */}
+        <div id="marquee" className="gelap relative z-[1] overflow-hidden pb-[90px] pt-[26px] text-white [mask-image:linear-gradient(90deg,transparent,#000_8%,#000_92%,transparent)]">
+          <div className="flex w-max animate-mq items-center gap-16" aria-label="Fakta singkat">
+            {[0, 1].map((salinan) => (
+              <div key={salinan} className="flex items-center gap-16" aria-hidden={salinan === 1 || undefined}>
+                <span className="font-mono text-[11px] uppercase text-cl-muted">Fakta singkat</span>
+                {fakta.map((f) => (
+                  <span key={`${salinan}-${f}`} className="whitespace-nowrap text-2xl tracking-[-0.02em] opacity-90">
+                    {f}
+                  </span>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Cara kerja: panel terang yang menimpa section gelap */}
         <section
-          id="dua-jalur"
-          className="bg-cb-kertas"
-          aria-labelledby="judul-jalur"
+          id="cara-kerja"
+          aria-labelledby="judul-cara"
+          data-panel
+          className="relative z-[3] -my-[30px] rounded-[24px] bg-cl-paper py-[140px] pb-[170px] text-cl-ink shadow-[0_-20px_60px_rgba(0,0,0,0.35)] max-[560px]:py-[100px] max-[560px]:pb-[130px]"
         >
-          <div className="mx-auto max-w-6xl px-5 py-16 sm:py-24">
-            <Ungkap>
-              <h2
-                id="judul-jalur"
-                className="font-cb-headline max-w-2xl text-[32px] font-normal leading-[1.1] tracking-[-0.02em] sm:text-[44px]"
-              >
-                Dua jalur untuk satu video panjang
-              </h2>
-              <p className="mt-5 max-w-2xl leading-relaxed text-cb-tinta-lembut">
-                Jalur instan mengandalkan analisis otomatis. Jalur organic
-                memakai editor yang mengerjakan potongan lalu menayangkannya
-                dari akunnya sendiri.
-              </p>
-            </Ungkap>
+          <div className="mx-auto max-w-[1320px] px-4 sm:px-6">
+            <div className="mb-[130px] grid gap-12 max-[980px]:mb-[60px] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+              <Reveal>
+                <p className="m-0 max-w-[22ch] text-base leading-[1.35]">Klip vertikal tanpa jam-jam di depan timeline</p>
+              </Reveal>
+              <Reveal kata>
+                <h2 id="judul-cara" className="m-0 text-[clamp(34px,4.6vw,66px)] font-light leading-[1.02] tracking-[-0.035em] text-balance">
+                  <Words text="Dibuat untuk kreator, yang mengejar jangkauan" aksen="yang mengejar jangkauan" />
+                </h2>
+              </Reveal>
+            </div>
 
-            <div className="mt-12 grid gap-5 md:grid-cols-12">
-              <Ungkap kelas="md:col-span-7">
-                <article className="rounded-lg bg-cb-kabut p-6 sm:p-8 md:h-full">
-                  <h3 className="font-cb-headline text-2xl font-medium tracking-tight">Jalur instan</h3>
-                  <p className="mt-3 max-w-xl leading-relaxed text-cb-tinta-lembut">
-                    Cocok kalau kamu mau hasil cepat dan tidak ingin
-                    mengatur orang. Mesin yang menentukan momen, kamu yang
-                    menyetel sisanya.
-                  </p>
-                  <ul className="mt-7 space-y-3">
-                    {jalurInstan.map((baris) => (
-                      <li key={baris} className="flex gap-3 text-sm">
-                        <Tanda warna="lembut" />
-                        <span>{baris}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <a
-                    href="/unggah"
-                    className="mt-8 inline-flex min-h-[44px] items-center text-sm font-semibold text-cb-tinta underline underline-offset-4 transition-colors duration-200 hover:text-cb-tinta-lembut"
-                  >
-                    Unggah dan mulai analisis
-                  </a>
-                </article>
-              </Ungkap>
+            <div className="grid items-start gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+              <div className="sticky top-[130px] max-[980px]:static max-[980px]:mb-[46px]">
+                <p className="mb-[22px] font-mono text-xs uppercase tracking-[-0.02em]">Cara kerja</p>
+                <StepList items={langkah} />
+              </div>
 
-              <Ungkap jeda={120} kelas="md:col-span-5">
-                <article className="rounded-lg border border-cb-garis p-6 sm:p-8 md:h-full">
-                  <h3 className="font-cb-headline text-2xl font-medium tracking-tight">Jalur organic</h3>
-                  <p className="mt-3 leading-relaxed text-cb-tinta-lembut">
-                    Cocok kalau kamu ingin banyak potongan dari satu video dan
-                    tidak masalah membayar per hasil.
-                  </p>
-                  <ul className="mt-7 space-y-3">
-                    {jalurOrganic.map((baris) => (
-                      <li key={baris} className="flex gap-3 text-sm">
-                        <Tanda warna="lembut" />
-                        <span>{baris}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <a
-                    href="/kampanye/baru"
-                    className="mt-8 inline-flex min-h-[44px] items-center text-sm font-semibold text-cb-tinta underline underline-offset-4 transition-colors duration-200 hover:text-cb-tinta-lembut"
-                  >
-                    Tulis brief kampanye
-                  </a>
-                </article>
-              </Ungkap>
+              <div className="mx-auto grid max-w-[600px] gap-[110px] max-[980px]:max-w-none max-[980px]:gap-[70px]">
+                <Blok nomor={0} judul="Dari unggah pertama, langsung masuk antrean." isi="Berkas MP4 dikirim langsung ke penyimpanan, jadi videomu tidak mampir ke server web. Status tiap job bisa kamu pantau di dasbor.">
+                  <div className="relative grid aspect-[4/3.2] place-items-center overflow-hidden rounded-xl bg-[#14081b] max-[560px]:aspect-square [background:radial-gradient(80%_90%_at_70%_100%,#a3238a,transparent_70%),radial-gradient(60%_60%_at_10%_0%,#5a1257,transparent_70%),#14081b]">
+                    <div className="w-[78%] rounded-lg bg-[#f4f6fa]/95 px-[18px] pb-3 pt-[18px] text-cl-ink shadow-[0_24px_60px_rgba(0,0,0,0.45)] max-[560px]:w-[92%]">
+                      <p className="mb-3 flex justify-between gap-3 font-mono text-[10.5px] uppercase text-[#6d79a8]">
+                        <span>Batas yang berlaku</span>
+                        <span>jalur instan</span>
+                      </p>
+                      <Spek n="Ukuran berkas" v="2 GB" utama />
+                      <Spek n="Durasi video" v="30 menit" />
+                      <Spek n="Biaya" v="1 kredit" />
+                    </div>
+                  </div>
+                </Blok>
+
+                <Blok nomor={1} judul="Momen ditandai sebelum kamu mencarinya." isi="Analisis memecah video jadi beberapa momen dan menandai hook tiap momen. Klip dimulai dari kalimat pembuka, bukan dari basa-basi.">
+                  <div className="relative grid aspect-[4/3.2] place-items-center overflow-hidden rounded-xl border border-[#dde4ea] bg-cl-slate max-[560px]:aspect-square">
+                    <span className="absolute left-3.5 top-3.5 z-[2] bg-cl-ink px-2 py-1 font-mono text-[10.5px] uppercase text-white">Ilustrasi</span>
+                    <HighlightMap />
+                  </div>
+                </Blok>
+
+                <Blok nomor={2} judul="Setiap penyimpanan jadi versi baru." isi="Titik potong, efek per beat, dan judul tersimpan di tiap momen. Kamu bisa kembali ke versi sebelumnya kapan saja.">
+                  <div className="relative grid aspect-[4/3.2] place-items-center overflow-hidden rounded-xl bg-cl-night max-[560px]:aspect-square">
+                    <span className="absolute left-3.5 top-3.5 z-[2] bg-cl-ink px-2 py-1 font-mono text-[10.5px] uppercase text-white">Log job</span>
+                    <LogJob />
+                  </div>
+                </Blok>
+
+                <Blok nomor={3} judul="Views datang dari akunmu sendiri." isi="Klip organic tayang dari akun yang kamu sambungkan, jadi angka views berasal dari sumber resmi. Akun TikTok masih menunggu verifikasi dari pihak TikTok.">
+                  <div className="relative grid aspect-[4/3.2] place-items-center overflow-hidden rounded-xl border border-[#dde4ea] bg-cl-slate max-[560px]:aspect-square">
+                    <ViewsChart />
+                  </div>
+                </Blok>
+              </div>
             </div>
           </div>
         </section>
 
-        <section id="cara-kerja" className="bg-cb-kabut" aria-labelledby="judul-cara">
-          <div className="mx-auto max-w-6xl px-5 py-16 sm:py-24">
-            <Ungkap>
-              <h2
-                id="judul-cara"
-                className="font-cb-headline max-w-2xl text-[32px] font-normal leading-[1.1] tracking-[-0.02em] sm:text-[44px]"
-              >
-                Empat langkah dari video mentah sampai klip
-              </h2>
-            </Ungkap>
+        {/* Keamanan dan peran */}
+        <section id="keamanan" aria-labelledby="judul-keamanan" className="gelap relative py-[230px] pb-[150px] text-white max-[980px]:py-[170px] max-[980px]:pb-[100px]">
+          <div className="mx-auto max-w-[1320px] px-4 sm:px-6">
+            <div className="mb-[220px] grid gap-12 max-[980px]:mb-[120px] lg:grid-cols-[minmax(0,5fr)_minmax(0,5fr)]">
+              <Reveal>
+                <p className="m-0 font-mono text-xs uppercase">Keamanan</p>
+                <h2 id="judul-keamanan" className="mb-7 mt-[22px] text-[clamp(34px,4.6vw,66px)] font-light leading-[1.02] tracking-[-0.035em] text-balance">
+                  Uang dan data tetap <span className="text-cl-accent">terjaga</span>
+                </h2>
+                <div className="flex flex-wrap gap-2.5">
+                  <Link href="/keamanan" className={tombolPrimer}>
+                    Buka halaman keamanan
+                  </Link>
+                  <Link href="/masuk" className={tombolSekunder}>
+                    Masuk
+                  </Link>
+                </div>
+              </Reveal>
+              <div className="grid content-start gap-[30px] pt-2.5">
+                <Poin judul="Verifikasi dua langkah" isi="Bisa kamu nyalakan untuk akun yang memegang saldo kredit dan rekening pencairan." />
+                <Poin judul="Rekening pencairan terenkripsi" isi="Nomor rekening disimpan terenkripsi di server. Mengganti rekening mereset status verifikasinya." />
+                <Poin judul="Pemisahan data" isi="Setiap baris dijaga row level security, jadi baris milik orang lain tidak bisa dibaca dari sisi klien." />
+                <Poin judul="Dana kampanye dicatat sebagai escrow" isi="Gerak uang nyata lewat Xendit belum aktif. Statusnya ditampilkan apa adanya." />
+              </div>
+            </div>
 
-            <ol className="mt-14 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
-              {langkah.map((l, i) => (
-                <li key={l.nama} className="relative border-t border-cb-tinta/20 pt-8">
-                  <Ungkap jeda={i * 90}>
-                    <h3 className="font-cb-headline text-xl font-medium tracking-tight">{l.nama}</h3>
-                    <p className="mt-3 text-sm leading-relaxed text-cb-tinta-lembut">
-                      {l.isi}
-                    </p>
-                  </Ungkap>
+            <div id="peran" className="flex flex-col items-center gap-6 text-center">
+              <Reveal kata>
+                <h2 id="judul-peran" className="m-0 text-[clamp(32px,3.6vw,50px)] font-light leading-[1.02] tracking-[-0.035em] text-balance">
+                  <Words text="Untuk yang punya videonya, dan yang memotongnya" aksen="dan yang memotongnya" />
+                </h2>
+              </Reveal>
+              <RoleCards />
+              <Link href="/kampanye/baru" className={`${tombolPrimer} mt-3.5`}>
+                Tulis brief kampanye
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* Status rilis: panel slate */}
+        <section
+          id="status"
+          aria-labelledby="judul-status"
+          data-panel
+          className="relative z-[3] -my-[30px] rounded-[24px] bg-cl-slate py-[170px] pb-[150px] text-cl-ink shadow-[0_-20px_60px_rgba(0,0,0,0.35)] max-[980px]:py-[120px]"
+        >
+          <div className="mx-auto max-w-[1320px] px-4 sm:px-6">
+            <div className="mb-[70px] grid gap-12 max-[980px]:gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+              <Reveal>
+                <p className="m-0 font-mono text-xs uppercase">Status rilis</p>
+              </Reveal>
+              <Reveal kata>
+                <h2 id="judul-status" className="m-0 text-[clamp(34px,4.6vw,66px)] font-light leading-[1.02] tracking-[-0.035em] text-balance">
+                  <Words text="Yang sudah jalan, dan yang menyusul" aksen="dan yang menyusul" />
+                </h2>
+              </Reveal>
+            </div>
+            <ul className="grid gap-3 md:grid-cols-3">
+              {statusRilis.map((s, i) => (
+                <li key={s.isi}>
+                  <Reveal delay={i * 0.08}>
+                    <article className="flex min-h-[190px] flex-col gap-[18px] rounded bg-white p-4 pb-7 transition-[transform,box-shadow] duration-300 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(23,43,118,0.12)]">
+                      <p className="m-0 font-mono text-[10.5px] uppercase text-cl-ink">{s.label}</p>
+                      <p className="m-0 text-[19px] leading-tight tracking-[-0.015em]">{s.isi}</p>
+                    </article>
+                  </Reveal>
                 </li>
               ))}
-            </ol>
-
-            <p className="mt-12 max-w-3xl rounded-md bg-cb-kertas px-4 py-3 text-sm text-cb-tinta-lembut">
-              Catatan status: unggah dan antrean job sudah jalan. Analisis dan
-              render otomatis masih dalam pengerjaan.
-            </p>
+            </ul>
           </div>
         </section>
 
-        <section id="studio" className="gelap bg-cb-malam text-white" aria-labelledby="judul-studio">
-          <div className="mx-auto max-w-6xl px-5 py-20 sm:py-32">
-            <Ungkap>
-              <h2
-                id="judul-studio"
-                className="font-cb-headline max-w-2xl text-[32px] font-normal leading-[1.1] tracking-[-0.02em] sm:text-[44px]"
-              >
-                Hasil analisis bukan kotak hitam
+        {/* Ajakan */}
+        <section aria-labelledby="judul-ajakan" className="gelap relative py-24 text-white sm:py-36">
+          <div className="mx-auto max-w-[1320px] px-4 sm:px-6">
+            <Reveal kata>
+              <h2 id="judul-ajakan" className="m-0 max-w-3xl text-[40px] font-light leading-[1.02] tracking-[-0.025em] sm:text-[60px] text-balance">
+                <Words text="Mulai dari satu video panjang." />
               </h2>
-              <p className="mt-5 max-w-2xl text-cb-malam-lembut">
-                Semua keputusan potongan terbuka di Studio. Kalau mesin salah
-                baca momen, kamu tinggal geser.
-              </p>
-            </Ungkap>
-
-            <div className="mt-14 grid gap-10 md:grid-cols-12">
-              <Ungkap kelas="md:col-span-7">
-                <figure>
-                  <div className="rounded-lg border border-cb-garis-gelap p-4 sm:p-6">
-                    <p className="font-cb-mono text-[13px] text-cb-malam-lembut">
-                      Beberapa momen dari satu video panjang
-                    </p>
-                    <ul className="mt-4 grid gap-2 sm:grid-cols-[38fr_31fr_31fr]">
-                      {momenContoh.map((m) => (
-                        <li
-                          key={m.nama}
-                          className="rounded-md border border-cb-garis-gelap bg-cb-malam px-3 py-3"
-                        >
-                          <p className="text-sm font-semibold">{m.nama}</p>
-                          <p className="mt-1 hidden text-xs leading-relaxed text-cb-malam-lembut sm:block">
-                            {m.isi}
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <figcaption className="mt-4 text-sm text-cb-malam-lembut">
-                    Bentuk edit plan: satu video panjang dipecah jadi beberapa
-                    momen, dan tiap momen menyimpan titik potong, hook, dan
-                    efeknya sendiri. Ini diagram, bukan tangkapan layar.
-                  </figcaption>
-                </figure>
-              </Ungkap>
-
-              <Ungkap jeda={120} kelas="md:col-span-5">
-                <dl className="divide-y divide-cb-garis-gelap">
-                  {kolomEditPlan.map((k) => (
-                    <div key={k.istilah} className="py-4 first:pt-0">
-                      <dt className="font-semibold">{k.istilah}</dt>
-                      <dd className="mt-1 text-sm text-cb-malam-lembut">
-                        {k.arti}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              </Ungkap>
-            </div>
-          </div>
-        </section>
-
-        <section id="peran" className="bg-cb-kertas" aria-labelledby="judul-peran">
-          <div className="mx-auto max-w-6xl px-5 py-16 sm:py-24">
-            <Ungkap>
-              <h2
-                id="judul-peran"
-                className="font-cb-headline max-w-3xl text-[32px] font-normal leading-[1.1] tracking-[-0.02em] sm:text-[44px]"
-              >
-                Untuk yang punya videonya, dan yang memotongnya
-              </h2>
-            </Ungkap>
-
-            <div className="mt-14 grid gap-y-12 sm:grid-cols-2 sm:gap-x-0">
-              <Ungkap>
-                <div className="sm:pr-12">
-                  <h3 className="font-cb-headline text-2xl font-medium tracking-tight">Kreator</h3>
-                  <ul className="mt-5 space-y-3 text-sm leading-relaxed">
-                    {sisiKreator.map((baris) => (
-                      <li key={baris}>{baris}</li>
-                    ))}
-                  </ul>
-                </div>
-              </Ungkap>
-
-              <Ungkap jeda={120}>
-                <div className="sm:border-l sm:border-cb-garis sm:pl-12">
-                  <h3 className="font-cb-headline text-2xl font-medium tracking-tight">Editor</h3>
-                  <ul className="mt-5 space-y-3 text-sm leading-relaxed">
-                    {sisiEditor.map((baris) => (
-                      <li key={baris}>{baris}</li>
-                    ))}
-                  </ul>
-                </div>
-              </Ungkap>
-            </div>
-          </div>
-        </section>
-
-        <section id="keamanan" className="bg-cb-kabut" aria-labelledby="judul-aman">
-          <div className="mx-auto max-w-6xl px-5 py-16 sm:py-24">
-            <Ungkap>
-              <h2
-                id="judul-aman"
-                className="font-cb-headline text-[32px] font-normal leading-[1.1] tracking-[-0.02em] sm:text-[44px]"
-              >
-                Uang dan data
-              </h2>
-              <dl className="mt-12 grid gap-x-8 gap-y-8 sm:grid-cols-3">
-                {jagaData.map((j) => (
-                  <div key={j.istilah} className="border-t border-cb-tinta/20 pt-5">
-                    <dt className="font-semibold">{j.istilah}</dt>
-                    <dd className="mt-2 text-sm leading-relaxed text-cb-tinta-lembut">
-                      {j.arti}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </Ungkap>
-
-            <Ungkap jeda={120}>
-              <div className="mt-12 flex flex-col gap-6 rounded-lg bg-cb-kertas p-6 sm:flex-row sm:items-start sm:justify-between sm:p-8">
-                <div className="sm:max-w-md">
-                  <h3 className="font-cb-headline text-lg font-medium">
-                    Views dari akunmu sendiri
-                  </h3>
-                  <p className="mt-3 text-sm leading-relaxed text-cb-tinta-lembut">
-                    Klip organic ditayangkan dari akun yang kamu sambungkan,
-                    supaya angka views-nya datang dari sumber resmi, bukan
-                    hitungan platform.
-                  </p>
-                </div>
-                <p className="text-sm leading-relaxed text-cb-tinta-lembut sm:max-w-xs sm:border-l sm:border-cb-garis sm:pl-6">
-                  Yang belum bisa: akun TikTok. Penyambungannya masih menunggu
-                  verifikasi dari pihak TikTok.
-                </p>
-              </div>
-            </Ungkap>
-          </div>
-        </section>
-
-        <section aria-labelledby="judul-status" className="bg-cb-kertas">
-          <div className="mx-auto max-w-6xl px-5 py-14">
-            <Ungkap>
-              <h2 id="judul-status" className="font-cb-headline text-xl font-medium">
-                Status rilis
-              </h2>
-              <ul className="mt-6 grid gap-4 text-sm leading-relaxed text-cb-tinta-lembut sm:grid-cols-2">
-                {statusRilis.map((baris) => (
-                  <li key={baris} className="border-t border-cb-garis pt-4">
-                    {baris}
-                  </li>
-                ))}
-              </ul>
-            </Ungkap>
-          </div>
-        </section>
-
-        <section aria-labelledby="judul-ajakan" className="gelap bg-cb-malam text-white">
-          <div className="mx-auto max-w-6xl px-5 py-24 sm:py-36">
-            <Ungkap>
-              <h2
-                id="judul-ajakan"
-                className="font-cb-headline max-w-3xl text-[40px] font-light leading-[1.02] tracking-[-0.025em] sm:text-[60px]"
-              >
-                Mulai dari satu video panjang
-              </h2>
-              <p className="mt-6 max-w-xl text-cb-malam-lembut">
-                Buat akun, verifikasi email, lalu unggah video pertamamu. Saldo
-                kredit dipakai hanya saat kamu menjalankan jalur instan.
+            </Reveal>
+            <Reveal delay={0.2}>
+              <p className="mb-0 mt-6 max-w-xl text-cl-muted">
+                Buat akun, verifikasi email, lalu unggah video pertamamu. Saldo kredit dipakai hanya saat kamu
+                menjalankan jalur instan.
               </p>
               <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-                <a href="/daftar" className={gayaPrimer}>
+                <Link href="/daftar" className={tombolPrimer}>
                   Buat akun
-                </a>
-                <a href="/masuk" className={gayaSekunderGelap}>
+                </Link>
+                <Link href="/masuk" className={tombolSekunder}>
                   Masuk
-                </a>
+                </Link>
               </div>
-            </Ungkap>
+            </Reveal>
           </div>
         </section>
       </main>
 
-      <footer className="border-t border-cb-garis bg-cb-kertas">
-        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-5 py-10 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="font-cb-headline font-semibold tracking-tight">TukangClip</p>
-            <p className="mt-1 text-sm text-cb-tinta-lembut">
-              Potong video panjang jadi klip vertikal.
-            </p>
+      <footer className="gelap relative z-[1] pb-10 pt-[200px] text-white">
+        <div className="mx-auto max-w-[1320px] px-4 sm:px-6">
+          <div className="mb-[360px] grid gap-8 max-[980px]:mb-[200px] lg:grid-cols-[minmax(0,5fr)_minmax(0,3.5fr)_minmax(0,3.5fr)] lg:gap-12">
+            <div>
+              <Link href="/" className="mb-[22px] flex min-h-[44px] items-center gap-2.5 text-[19px]">
+                <span aria-hidden="true" className="flex h-[18px] items-center gap-[2.5px]">
+                  <i className="block h-[6px] w-[3px] rounded-[1px] bg-cl-accent" />
+                  <i className="block h-4 w-[3px] rounded-[1px] bg-cl-accent" />
+                  <i className="block h-[11px] w-[3px] rounded-[1px] bg-cl-accent" />
+                  <i className="block h-[6px] w-[3px] rounded-[1px] bg-cl-accent" />
+                </span>
+                TukangClip
+              </Link>
+              <p className="m-0 max-w-[30ch] text-sm text-cl-muted">Potong video panjang jadi klip vertikal.</p>
+            </div>
+            <nav aria-labelledby="judul-produk">
+              <h2 id="judul-produk" className="mb-3.5 text-xs font-normal text-cl-muted">Produk</h2>
+              <ul className="m-0 grid list-none gap-1 p-0 text-[13px]">
+                <FootLink href="/pasar" label="Pasar proyek" />
+                <FootLink href="/kredit" label="Kredit AI" />
+                <FootLink href="/akun" label="Akun sosial" />
+                <FootLink href="/keamanan" label="Keamanan" />
+              </ul>
+            </nav>
+            <nav aria-labelledby="judul-akun">
+              <h2 id="judul-akun" className="mb-3.5 text-xs font-normal text-cl-muted">Akun</h2>
+              <ul className="m-0 grid list-none gap-1 p-0 text-[13px]">
+                <FootLink href="/masuk" label="Masuk" />
+                <FootLink href="/daftar" label="Buat akun" />
+                <FootLink href="/dasbor" label="Dasbor" />
+              </ul>
+            </nav>
           </div>
-          <nav aria-label="Kaki halaman">
-            <ul className="flex flex-wrap gap-x-2 gap-y-1 text-sm">
-              {tautanKaki.map((t) => (
-                <li key={t.href}>
-                  <a
-                    href={t.href}
-                    className="inline-flex min-h-[44px] items-center px-2 text-cb-tinta-lembut transition-colors duration-200 hover:text-cb-tinta"
-                  >
-                    {t.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </nav>
+          <div className="mt-20 flex flex-wrap justify-between gap-4 border-t border-white/10 pb-[env(safe-area-inset-bottom,0px)] pt-5 text-[12.5px] text-cl-muted">
+            <span>© 2026 TukangClip</span>
+            <span>Verifikasi dua langkah dan rekening terenkripsi tersedia di halaman keamanan.</span>
+          </div>
         </div>
       </footer>
+    </>
+  );
+}
+
+function Blok({ nomor, judul, isi, children }: { nomor: number; judul: string; isi: string; children: React.ReactNode }) {
+  return (
+    <article data-step={nomor} className="text-cl-ink">
+      <Reveal>
+        {children}
+        <h3 className="mb-2 mt-[26px] text-xl font-normal leading-tight tracking-[-0.015em]">{judul}</h3>
+        <p className="m-0 max-w-[44ch] text-[15px] leading-normal text-[#3b4a86]">{isi}</p>
+      </Reveal>
+    </article>
+  );
+}
+
+function Spek({ n, v, utama = false }: { n: string; v: string; utama?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-t border-[#dfe4ee] py-3">
+      <span className="font-mono text-[10.5px] uppercase">{n}</span>
+      <span className={`text-[22px] font-light tabular-nums ${utama ? "text-cl-accent" : ""}`}>{v}</span>
     </div>
   );
 }
 
-/** Dua bar dari mark TukangClip. Dipakai sebagai penanda judul atau butir daftar. */
-function Tanda({ warna = "tinta" }: { warna?: "tinta" | "kuning" | "lembut" }) {
-  const kelas = {
-    tinta: "bg-cb-tinta",
-    kuning: "bg-kuning",
-    lembut: "bg-cb-tinta-lembut"
-  }[warna];
+function Poin({ judul, isi }: { judul: string; isi: string }) {
   return (
-    <span aria-hidden="true" className="mt-2 flex shrink-0 flex-col gap-[3px]">
-      <span className={`block h-[3px] w-4 rounded-full ${kelas}`} />
-      <span className={`block h-[3px] w-4 rounded-full ${kelas}`} />
-    </span>
+    <Reveal>
+      <h3 className="mb-1.5 flex items-center gap-2 text-[15px] font-medium before:block before:h-[5px] before:w-[5px] before:rounded-[1px] before:bg-cl-accent">
+        {judul}
+      </h3>
+      <p className="m-0 max-w-[48ch] text-sm leading-normal text-cl-muted">{isi}</p>
+    </Reveal>
+  );
+}
+
+function FootLink({ href, label }: { href: string; label: string }) {
+  return (
+    <li>
+      <Link href={href} className="inline-flex min-h-[44px] items-center transition-colors hover:text-cl-accent">
+        {label}
+      </Link>
+    </li>
   );
 }

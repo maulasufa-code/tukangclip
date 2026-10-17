@@ -23,52 +23,19 @@ body {
   outline-offset: 2px;
 }
 
-/* Bidang gelap landing. Kuning hanya aman sebagai aksen di atas gelap, lihat DESIGN.md. */
+/* Bidang gelap landing: cincin fokus ikut terang di atas gelap. */
 .gelap {
-  --fokus: #fcc401;
+  --fokus: #ff488b;
   color-scheme: dark;
 }
 
 .gelap ::selection {
-  background: #fcc401;
-  color: #1a1408;
+  background: #ff488b;
+  color: #1a0610;
 }
 
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
-  }
-}
-
-/* Kemunculan section saat masuk viewport. Aturan ini hanya ada saat motion diizinkan,
-   jadi pengguna reduced motion (atau tanpa JS) selalu melihat kontennya. */
-@media (prefers-reduced-motion: no-preference) {
-  .ungkap {
-    opacity: 0;
-    transform: translateY(16px);
-    transition:
-      opacity 600ms cubic-bezier(0.4, 0, 0.2, 1),
-      transform 600ms cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .ungkap-tampil {
-    opacity: 1;
-    transform: none;
-  }
-
-  /* Hero masuk sekali saat halaman dibuka, lalu diam. */
-  .hero-masuk {
-    animation: hero-masuk 700ms cubic-bezier(0.4, 0, 0.2, 1) both;
-  }
-
-  @keyframes hero-masuk {
-    from {
-      opacity: 0;
-      transform: translateY(12px);
-    }
-    to {
-      opacity: 1;
-      transform: none;
-    }
   }
 }
