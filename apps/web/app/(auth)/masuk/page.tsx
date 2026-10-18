@@ -21,19 +21,28 @@ export default function MasukPage() {
     });
     if (error) {
       setStatus("gagal");
-      setPesan(error.message);
+      setPesan(
+        error.message.toLowerCase().includes("invalid login")
+          ? "Email atau kata sandi tidak cocok."
+          : error.message
+      );
       return;
     }
-    router.push("/dasbor");
+    // Hanya tujuan di dalam situs. Parameter lain diabaikan.
+    const next = new URLSearchParams(window.location.search).get("next");
+    router.push(next && next.startsWith("/") && !next.startsWith("//") ? next : "/dasbor");
     router.refresh();
   }
 
   return (
     <section aria-labelledby="judul-masuk">
-      <h1 id="judul-masuk" className="text-2xl font-bold">
+      <h1 id="judul-masuk" className="font-display text-3xl font-light">
         Masuk
       </h1>
-      <form onSubmit={kirim} className="mt-6 space-y-4">
+      <p className="mt-2 text-sm text-cl-ink-soft">
+        Pakai email dan kata sandi yang kamu buat saat mendaftar.
+      </p>
+      <form onSubmit={kirim} className="mt-8 space-y-5">
         <div>
           <label htmlFor="email" className="block text-sm font-medium">
             Email
@@ -45,7 +54,7 @@ export default function MasukPage() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full min-h-[44px] rounded-md border border-stone-300 px-3"
+            className="mt-1.5 min-h-[44px] w-full rounded-md border border-cl-ink-soft bg-white px-3 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cl-ink"
           />
         </div>
         <div>
@@ -59,22 +68,28 @@ export default function MasukPage() {
             required
             value={kataSandi}
             onChange={(e) => setKataSandi(e.target.value)}
-            className="mt-1 w-full min-h-[44px] rounded-md border border-stone-300 px-3"
+            className="mt-1.5 min-h-[44px] w-full rounded-md border border-cl-ink-soft bg-white px-3 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cl-ink"
           />
         </div>
         {status === "gagal" && (
-          <p role="alert" className="text-sm text-red-800">
-            Gagal masuk: {pesan}
+          <p role="alert" className="rounded-md bg-cl-slate px-3 py-2 text-sm text-cl-rust">
+            Gagal masuk. {pesan}
           </p>
         )}
         <button
           type="submit"
           disabled={status === "sibuk"}
-          className="min-h-[44px] w-full rounded-md bg-stone-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-60"
+          className="inline-flex min-h-[44px] w-full items-center justify-center rounded-[7px] bg-cl-accent px-4 font-mono text-xs uppercase text-cl-accent-ink transition-transform hover:-translate-y-0.5 hover:bg-cl-accent-hi focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cl-ink disabled:translate-y-0 disabled:opacity-60"
         >
           {status === "sibuk" ? "Memeriksa..." : "Masuk ke dasbor"}
         </button>
       </form>
+      <p className="mt-6 text-sm">
+        Belum punya akun?{" "}
+        <a href="/daftar" className="font-medium underline underline-offset-4">
+          Buat akun
+        </a>
+      </p>
     </section>
   );
 }

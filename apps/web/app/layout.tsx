@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Archivo, DM_Mono, Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
+import { SmoothScroll } from "@/components/smooth-scroll";
 
 const archivo = Archivo({
   subsets: ["latin"],
@@ -25,7 +26,7 @@ const mono = DM_Mono({
 
 export const metadata: Metadata = {
   title: "TukangClip",
-  description: "Potong video panjang jadi klip vertikal. Otomatis atau lewat editor."
+  description: "Potong video panjang jadi klip vertikal. Buka kampanye, clipper memotong, bayar per views."
 };
 
 export default function RootLayout({
@@ -42,6 +43,7 @@ export default function RootLayout({
         >
           Lewati ke isi
         </a>
+        <SmoothScroll />
         {children}
       </body>
     </html>

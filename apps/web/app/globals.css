@@ -7,35 +7,28 @@
 }
 
 html {
-  scroll-behavior: smooth;
   /* Tinggi header sticky landing, supaya anchor tidak berhenti di baliknya. */
   scroll-padding-top: 5rem;
 }
 
 body {
-  background: #fafaf9;
-  color: #1c1917;
+  background: #fff9e6;
+  color: #1f1400;
 }
 
 /* Cincin fokus default untuk halaman terang. */
 :focus-visible {
-  outline: 3px solid var(--fokus, #b45309);
+  outline: 3px solid var(--fokus, #8a3a00);
   outline-offset: 2px;
 }
 
 /* Bidang gelap landing: cincin fokus ikut terang di atas gelap. */
 .gelap {
-  --fokus: #ff488b;
+  --fokus: #fcc501;
   color-scheme: dark;
 }
 
 .gelap ::selection {
-  background: #ff488b;
-  color: #1a0610;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
+  background: #fcc501;
+  color: #1f1400;
 }

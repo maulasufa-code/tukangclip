@@ -1,44 +1,136 @@
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
-import { apiGet } from "@/lib/api";
+import { ambilPengguna } from "@/lib/sesi";
+import { rupiah } from "@/lib/harga";
 import { KirimHasil } from "@/components/kirim-hasil";
+import { Chip, Isi, KepalaHalaman, Kosong, kartu, sisaWaktu, tanggal, tombolPrimer } from "@/components/ui";
+
+export const dynamic = "force-dynamic";
+
+type Lamaran = {
+  id: string;
+  status: string;
+  due_at: string | null;
+  campaign: { id: string; title: string; rate_per_1000_views: number } | null;
+};
+
+type Klip = { application_id: string; status: string; posted_url: string | null };
+
+const LABEL_LAMARAN: Record<string, string> = {
+  applied: "Menunggu",
+  accepted: "Diterima",
+  rejected: "Ditolak",
+  expired: "Kedaluwarsa",
+  cancelled: "Dibatalkan"
+};
+
+const LABEL_KLIP: Record<string, string> = {
+  draft: "Draf",
+  submitted: "Menunggu review",
+  approved: "Disetujui",
+  rejected: "Ditolak",
+  posted: "Tayang",
+  tracking: "Dilacak",
+  paid_out: "Dibayar"
+};
 
 export default async function KerjaankuPage() {
+  const pengguna = await ambilPengguna();
+  if (!pengguna) redirect("/masuk?next=/kerjaanku");
+
   const supabase = supabaseServer();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/masuk?next=/kerjaanku");
-  const data = await apiGet("/me/applications");
+  const { data, error } = await supabase
+    .from("applications")
+    .select("id,status,due_at,campaign:campaigns(id,title,rate_per_1000_views)")
+    .eq("editor_id", pengguna.id)
+    .order("created_at", { ascending: false });
+  const lamaran = (data ?? []) as unknown as Lamaran[];
+  const { data: klipData } = lamaran.length
+    ? await supabase
+        .from("submissions")
+        .select("application_id,status,posted_url")
+        .in("application_id", lamaran.map((l) => l.id))
+    : { data: [] as Klip[] };
+  const klip = (klipData ?? []) as Klip[];
 
   return (
-    <section aria-labelledby="judul-kerja">
-      <h1 id="judul-kerja" className="text-2xl font-bold">Kerjaanku</h1>
-      <p className="mt-2 text-sm text-stone-700">
-        Proyek yang kamu lamar. Unggah hasil sebelum tenggat 72 jam.
-      </p>
-      {!data ? (
-        <p className="mt-6 rounded-md border border-dashed p-6 text-sm">
-          API backend belum tersambung.
-        </p>
-      ) : data.items.length === 0 ? (
-        <div className="mt-6 rounded-md border border-dashed p-6 text-sm text-stone-700">
-          Belum ada lamaran. Cari proyek di <a href="/pasar" className="underline">pasar</a>.
-        </div>
-      ) : (
-        <ul className="mt-6 space-y-3 text-sm">
-          {data.items.map((a: { id: string; campaign_id: string; status: string; due_at: string | null }) => (
-            <li key={a.id} className="rounded-md border border-stone-200 p-4">
-              <p>
-                Status: {a.status}
-                {a.due_at ? ` · tenggat ${new Date(a.due_at).toLocaleString("id-ID")}` : ""}
-              </p>
-              <a href={`/kampanye/${a.campaign_id}`} className="underline">Lihat kampanye</a>
-              {a.status === "accepted" && <KirimHasil applicationId={a.id} />}
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+    <>
+      <KepalaHalaman
+        id="judul-kerja"
+        penanda="Clipper"
+        judul="Kerjaanku"
+        deskripsi="Proyek yang kamu lamar. Setelah diterima, kamu punya 72 jam untuk mengunggah klip hasilnya."
+        aksi={
+          <a href="/pasar" className={tombolPrimer}>
+            Cari kampanye
+          </a>
+        }
+      />
+      <Isi>
+        {error ? (
+          <Kosong gagal>Lamaranmu belum bisa dimuat ({error.message}). Muat ulang halaman ini.</Kosong>
+        ) : lamaran.length === 0 ? (
+          <Kosong>
+            Belum ada lamaran. Buka{" "}
+            <a href="/pasar" className="font-medium underline underline-offset-4">
+              daftar kampanye
+            </a>{" "}
+            dan lamar yang rate-nya sesuai.
+          </Kosong>
+        ) : (
+          <ul className="space-y-4">
+            {lamaran.map((l) => {
+              const miliknya = klip.filter((k) => k.application_id === l.id);
+              const sisa = l.status === "accepted" && !miliknya.length ? sisaWaktu(l.due_at) : null;
+              return (
+                <li key={l.id} className={`${kartu} p-5`}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <a
+                        href={l.campaign ? `/kampanye/${l.campaign.id}` : "/pasar"}
+                        className="text-lg font-medium underline-offset-4 hover:underline"
+                      >
+                        {l.campaign?.title ?? "Kampanye tidak tersedia"}
+                      </a>
+                      {l.campaign && (
+                        <p className="mt-1 text-sm text-stone-700">
+                          {rupiah(l.campaign.rate_per_1000_views)} per 1.000 views
+                        </p>
+                      )}
+                    </div>
+                    <Chip nada={l.status === "accepted" ? "aktif" : l.status === "applied" ? "netral" : "bahaya"}>
+                      {LABEL_LAMARAN[l.status] ?? l.status}
+                    </Chip>
+                  </div>
+
+                  {sisa && (
+                    <p className={`mt-3 text-sm font-medium ${sisa.lewat ? "text-red-900" : "text-cl-rust"}`}>
+                      {sisa.teks} · tenggat {tanggal(l.due_at)}
+                    </p>
+                  )}
+
+                  {miliknya.map((k, i) => (
+                    <p key={i} className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+                      <Chip nada={k.status === "rejected" ? "bahaya" : "aktif"}>
+                        {LABEL_KLIP[k.status] ?? k.status}
+                      </Chip>
+                      {k.posted_url && (
+                        <a href={k.posted_url} target="_blank" rel="noreferrer" className="underline underline-offset-4">
+                          Lihat tayangan
+                        </a>
+                      )}
+                    </p>
+                  ))}
+
+                  {l.status === "accepted" && (!miliknya.length || miliknya.every((k) => k.status === "rejected")) && (
+                    <KirimHasil applicationId={l.id} />
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Isi>
+    </>
   );
 }

@@ -1,70 +1,78 @@
 import { redirect } from "next/navigation";
-import { supabaseServer } from "@/lib/supabase/server";
+import { ambilPengguna } from "@/lib/sesi";
+import { apiGet } from "@/lib/api";
 import { BeliKredit } from "@/components/beli-kredit";
+import { Isi, Judul2, KepalaHalaman, Kosong, kartu } from "@/components/ui";
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "";
+export const dynamic = "force-dynamic";
+
+const NAMA_ALASAN: Record<string, string> = {
+  "topup-xendit": "Top-up kredit",
+  "pakai-job-ai": "Dipakai untuk satu video"
+};
 
 export default async function KreditPage() {
-  const supabase = supabaseServer();
-  const {
-    data: { session }
-  } = await supabase.auth.getSession();
-  if (!session) redirect("/masuk?next=/kredit");
+  const pengguna = await ambilPengguna();
+  if (!pengguna) redirect("/masuk?next=/kredit");
+  if (pengguna.peran === "editor") redirect("/dasbor");
 
-  let saldo: number | null = null;
-  let riwayat: { amount: number; reason: string; created_at: string }[] = [];
-  if (API) {
-    const res = await fetch(`${API}/credits`, {
-      headers: { authorization: `Bearer ${session.access_token}` },
-      cache: "no-store"
-    });
-    if (res.ok) {
-      const out = await res.json();
-      saldo = out.balance;
-      riwayat = out.history;
-    }
-  }
+  const data = await apiGet("/credits");
+  const saldo: number | null = data ? (data.balance as number) : null;
+  const riwayat: { amount: number; reason: string; created_at: string }[] = data?.history ?? [];
 
   return (
-    <section aria-labelledby="judul-kredit">
-      <h1 id="judul-kredit" className="text-2xl font-bold">
-        Kredit AI
-      </h1>
-      <p className="mt-2 text-sm text-stone-700">
-        1 kredit untuk 1 video. Beli via Xendit, komisi platform dipotong
-        transparan sebelum dikonversi jadi kredit.
-      </p>
-      <div className="mt-4 rounded-md border border-stone-200 p-4">
-        <p className="text-sm text-stone-600">Saldo</p>
-        <p className="text-3xl font-bold" role="status">
-          {saldo === null ? "Belum tersambung" : `${saldo} kredit`}
-        </p>
-        {!API && (
-          <p className="mt-1 text-sm text-stone-600">
-            Isi NEXT_PUBLIC_API_URL untuk melihat saldo asli.
-          </p>
-        )}
-      </div>
-      <h2 className="mt-6 font-semibold">Top-up</h2>
-      <BeliKredit />
-      <h2 className="mt-6 font-semibold">Riwayat</h2>
-      {riwayat.length === 0 ? (
-        <p className="mt-2 text-sm text-stone-600">
-          Belum ada mutasi. Mutasi muncul setelah top-up berhasil atau job dipakai.
-        </p>
-      ) : (
-        <ul className="mt-2 space-y-2 text-sm">
-          {riwayat.map((r, i) => (
-            <li key={i} className="flex justify-between rounded-md border border-stone-200 p-2">
-              <span>{r.reason}</span>
-              <span className={r.amount < 0 ? "text-red-800" : ""}>
-                {r.amount > 0 ? "+" : ""}
-                {r.amount}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+    <>
+      <KepalaHalaman
+        id="judul-kredit"
+        penanda="Jalur otomatis"
+        judul="Kredit AI"
+        deskripsi="1 kredit untuk 1 video. Beli via Xendit, komisi platform dipotong transparan sebelum dikonversi jadi kredit."
+      />
+      <Isi className="space-y-12">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+          <section aria-labelledby="judul-saldo" className="rounded-lg bg-cl-slate p-5 sm:p-7">
+            <h2 id="judul-saldo" className="font-mono text-xs uppercase text-cl-rust">
+              Saldo
+            </h2>
+            <p className="mt-3 text-5xl font-light tabular-nums" role="status">
+              {saldo === null ? "Belum terbaca" : saldo}
+            </p>
+            <p className="mt-1 text-cl-ink">{saldo === null ? "API backend belum tersambung." : "kredit"}</p>
+          </section>
+          <section aria-labelledby="judul-topup" className={`${kartu} p-5 sm:p-7`}>
+            <Judul2 id="judul-topup">Top-up</Judul2>
+            <BeliKredit />
+          </section>
+        </div>
+
+        <section aria-labelledby="judul-riwayat">
+          <Judul2 id="judul-riwayat">Riwayat</Judul2>
+          {riwayat.length === 0 ? (
+            <div className="mt-4">
+              <Kosong>
+                Belum ada mutasi. Mutasi muncul setelah top-up berhasil atau kredit dipakai untuk satu video.
+              </Kosong>
+            </div>
+          ) : (
+            <ul className={`${kartu} mt-4 divide-y divide-stone-200`}>
+              {riwayat.map((r, i) => (
+                <li key={i} className="flex items-center justify-between gap-4 p-4">
+                  <span>
+                    {NAMA_ALASAN[r.reason] ?? r.reason}
+                    <span className="block text-sm text-stone-700">
+                      {new Date(r.created_at).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}
+                    </span>
+                  </span>
+                  <span className={`text-lg tabular-nums ${r.amount < 0 ? "text-red-900" : ""}`}>
+                    {r.amount > 0 ? "+" : ""}
+                    {r.amount}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </Isi>
+    </>
   );
 }

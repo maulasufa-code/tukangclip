@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { isian, label, tombolGaris, tombolPrimer } from "@/components/ui";
 import { supabaseBrowser } from "@/lib/supabase/client";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -29,10 +30,10 @@ export function SambungButtons() {
   return (
     <div>
       <div className="flex gap-2">
-        <button onClick={() => sambung("youtube")} className="min-h-[44px] rounded-md bg-stone-900 px-4 text-sm text-white">
+        <button onClick={() => sambung("youtube")} className={tombolPrimer}>
           Sambung YouTube
         </button>
-        <button onClick={() => sambung("tiktok")} className="min-h-[44px] rounded-md border px-4 text-sm">
+        <button onClick={() => sambung("tiktok")} className={tombolGaris}>
           Sambung TikTok
         </button>
       </div>

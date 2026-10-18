@@ -9,6 +9,11 @@ from .schemas import CampaignCreate, Decision, Posted, Review, SubmissionCreate
 
 router = APIRouter()
 
+# Harus sama dengan MINIMAL_RATE di apps/web/lib/harga.ts.
+MINIMAL_RATE = 1_000
+# Batas lamaran aktif (menunggu atau diterima) per clipper, sama dengan yang dijanjikan di UI.
+MAKS_PROYEK_AKTIF = 3
+
 
 def campaign_or_404(client, cid: str) -> dict:
     c = client.table("campaigns").select("*").eq("id", cid).single().execute().data
@@ -22,8 +27,10 @@ def create_campaign(body: CampaignCreate, authorization: str | None = Header(def
     user_id = require_user(authorization)
     client = supa.service_client()
     require_role(client, user_id, ["creator", "admin"])
-    if body.budgetTotal <= 0 or body.ratePer1000 <= 0 or body.capPerClip <= 0:
-        raise HTTPException(status_code=400, detail="budget-rate-cap-harus-positif")
+    if body.budgetTotal <= 0 or body.capPerClip <= 0:
+        raise HTTPException(status_code=400, detail="budget-cap-harus-positif")
+    if body.ratePer1000 < MINIMAL_RATE:
+        raise HTTPException(status_code=400, detail="rate-di-bawah-minimal")
     if len(body.title) < 4:
         raise HTTPException(status_code=400, detail="judul-terlalu-pendek")
     row = {
@@ -46,12 +53,26 @@ def create_campaign(body: CampaignCreate, authorization: str | None = Header(def
     return saved[0]
 
 
+# Kolom yang boleh dilihat tanpa login di halaman jelajah.
+PUBLIC_CAMPAIGN_FIELDS = (
+    "id",
+    "title",
+    "brief",
+    "budget_total",
+    "budget_remaining",
+    "rate_per_1000_views",
+    "cap_per_clip",
+    "deadline_at",
+    "created_at",
+    "status",
+)
+
+
 @router.get("/campaigns")
-def list_campaigns(authorization: str | None = Header(default=None)):
-    require_user(authorization)
+def list_campaigns():
     client = supa.service_client()
     rows = client.table("campaigns").select("*").eq("status", "open").execute().data or []
-    return {"items": rows}
+    return {"items": [{k: r.get(k) for k in PUBLIC_CAMPAIGN_FIELDS} for r in rows]}
 
 
 @router.get("/campaigns/{cid}")
@@ -64,6 +85,12 @@ def get_campaign(cid: str, authorization: str | None = Header(default=None)):
     apps = client.table("applications").select("*").eq("campaign_id", cid).execute().data or []
     if c["creator_id"] != user_id:
         apps = [a for a in apps if a["editor_id"] == user_id]
+    else:
+        nama = {}
+        for eid in {a["editor_id"] for a in apps}:
+            row = client.table("profiles").select("display_name").eq("id", eid).execute().data or []
+            nama[eid] = (row[0].get("display_name") if row else "") or ""
+        apps = [{**a, "editor_name": nama.get(a["editor_id"], "")} for a in apps]
     return {**c, "applications": apps}
 
 
@@ -75,6 +102,10 @@ def apply(cid: str, authorization: str | None = Header(default=None)):
     c = campaign_or_404(client, cid)
     if c["status"] != "open":
         raise HTTPException(status_code=400, detail="kampanye-tidak-buka")
+    milik = client.table("applications").select("*").eq("editor_id", user_id).execute().data or []
+    aktif = [a for a in milik if a.get("status") in ("applied", "accepted")]
+    if len(aktif) >= MAKS_PROYEK_AKTIF:
+        raise HTTPException(status_code=409, detail="batas-proyek-aktif")
     try:
         saved = (
             client.table("applications")
@@ -159,6 +190,24 @@ def review(sid: str, body: Review, authorization: str | None = Header(default=No
     return {"ok": True, "status": status}
 
 
+@router.get("/submissions/{sid}/file")
+def submission_file(sid: str, authorization: str | None = Header(default=None)):
+    from . import r2 as r2mod
+
+    user_id = require_user(authorization)
+    client = supa.service_client()
+    s = client.table("submissions").select("*").eq("id", sid).single().execute().data
+    if not s:
+        raise HTTPException(status_code=404, detail="tidak-ditemukan")
+    a = client.table("applications").select("*").eq("id", s["application_id"]).single().execute().data
+    c = campaign_or_404(client, a["campaign_id"])
+    if user_id not in (a["editor_id"], c["creator_id"]):
+        raise HTTPException(status_code=403, detail="bukan-pihakmu")
+    if not s.get("file_r2_key"):
+        raise HTTPException(status_code=404, detail="tidak-ditemukan")
+    return {"url": r2mod.presigned_get(s["file_r2_key"], 600)}
+
+
 @router.post("/submissions/{sid}/posted")
 def mark_posted(sid: str, body: Posted, authorization: str | None = Header(default=None)):
     user_id = require_user(authorization)
@@ -231,10 +280,14 @@ def fund(cid: str, body: Fund, authorization: str | None = Header(default=None))
     c = campaign_or_404(client, cid)
     if c["creator_id"] != user_id:
         raise HTTPException(status_code=403, detail="bukan-kampanyemu")
-    if body.amount <= 0:
-        raise HTTPException(status_code=400, detail="nominal-tidak-valid")
     s = settings_map(client)
-    fee = body.amount * int(s.get("platform_fee_pct", 10)) // 100
+    minimal = int(s.get("min_campaign_topup_idr", 3_000_000))
+    if body.amount < minimal:
+        raise HTTPException(status_code=400, detail=f"minimal-topup-{minimal}")
+    # Biaya platform dibayar di atas budget, jadi seluruh body.amount masuk escrow.
+    # Webhook mengkredit escrow sebesar amount - fee.
+    fee = body.amount * int(s.get("campaign_fee_pct", 15)) // 100
+    total = body.amount + fee
     idem = str(uuid.uuid4())
     saved = (
         client.table("topup_intents")
@@ -242,7 +295,7 @@ def fund(cid: str, body: Fund, authorization: str | None = Header(default=None))
             {
                 "user_id": user_id,
                 "campaign_id": cid,
-                "amount": body.amount,
+                "amount": total,
                 "fee": fee,
                 "credits": 0,
                 "idempotency_key": idem,
@@ -254,13 +307,13 @@ def fund(cid: str, body: Fund, authorization: str | None = Header(default=None))
     if not saved:
         raise HTTPException(status_code=500, detail="gagal-buat-fund")
     try:
-        inv = xenditmod.create_invoice(body.amount, f"fund:{idem}")
+        inv = xenditmod.create_invoice(total, f"fund:{idem}")
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e)[:100])
     client.table("topup_intents").update({"xendit_id": inv["id"]}).eq(
         "idempotency_key", idem
     ).execute()
-    return {"payUrl": inv["url"], "fee": fee}
+    return {"payUrl": inv["url"], "fee": fee, "total": total}
 
 
 @router.post("/submissions/{sid}/dispute")

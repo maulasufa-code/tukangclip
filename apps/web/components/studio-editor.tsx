@@ -142,7 +142,7 @@ export function StudioEditor({
               aria-selected={i === active}
               onClick={() => setActive(i)}
               className={`min-h-[44px] min-w-[44px] rounded-md border px-3 py-2 text-sm ${
-                i === active ? "bg-stone-900 text-white" : "border-stone-300"
+                i === active ? "bg-cl-accent hover:bg-cl-accent-hi text-cl-accent-ink" : "border-stone-300"
               }`}
             >
               {i + 1}
@@ -230,7 +230,7 @@ export function StudioEditor({
             onChange={(e) => setBeatBaru(e.target.value)}
             className="min-h-[44px] w-24 rounded-md border border-stone-300 px-2"
           />
-          <button onClick={tambahCue} className="min-h-[44px] rounded-md bg-stone-900 px-4 text-sm text-white">
+          <button onClick={tambahCue} className="min-h-[44px] rounded-md bg-cl-accent hover:bg-cl-accent-hi px-4 text-sm text-cl-accent-ink">
             Tambah
           </button>
         </div>
@@ -264,7 +264,7 @@ export function StudioEditor({
           <button
             onClick={simpan}
             disabled={fase === "sibuk" || errors.length > 0}
-            className="min-h-[44px] flex-1 rounded-md bg-stone-900 px-4 text-sm text-white disabled:opacity-50"
+            className="min-h-[44px] flex-1 rounded-md bg-cl-accent hover:bg-cl-accent-hi px-4 text-sm text-cl-accent-ink disabled:opacity-50"
           >
             {fase === "sibuk" ? "Menyimpan..." : "Simpan versi baru"}
           </button>

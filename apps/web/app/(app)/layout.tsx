@@ -1,9 +1,11 @@
 import { Kerangka } from "@/components/kerangka";
+import { ambilPengguna } from "@/lib/sesi";
 
-export default function AppLayout({
+export default async function AppLayout({
   children
 }: {
   children: React.ReactNode;
 }) {
-  return <Kerangka>{children}</Kerangka>;
+  const pengguna = await ambilPengguna();
+  return <Kerangka pengguna={pengguna}>{children}</Kerangka>;
 }

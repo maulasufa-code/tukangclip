@@ -1,21 +1,24 @@
 import { redirect } from "next/navigation";
-import { supabaseServer } from "@/lib/supabase/server";
+import { ambilPengguna } from "@/lib/sesi";
 import { KampanyeForm } from "@/components/kampanye-form";
+import { Isi, KepalaHalaman } from "@/components/ui";
 
 export default async function KampanyeBaruPage() {
-  const supabase = supabaseServer();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/masuk?next=/kampanye/baru");
+  const pengguna = await ambilPengguna();
+  if (!pengguna) redirect("/masuk?next=/kampanye/baru");
+  if (pengguna.peran === "editor") redirect("/dasbor");
 
   return (
-    <section aria-labelledby="judul-baru">
-      <h1 id="judul-baru" className="text-2xl font-bold">Kampanye baru</h1>
-      <p className="mt-2 text-sm text-stone-700">
-        Budget dicatat sebagai escrow terkunci. Gerak uang nyata via Xendit menyusul di Fase 7.
-      </p>
-      <KampanyeForm />
-    </section>
+    <>
+      <KepalaHalaman
+        id="judul-baru"
+        penanda="Kreator"
+        judul="Kampanye baru"
+        deskripsi="Tulis brief, tentukan rate per 1.000 views, dan batasi bayaran per klip. Budget dicatat sebagai escrow terkunci; gerak uang nyata via Xendit belum aktif."
+      />
+      <Isi className="max-w-3xl">
+        <KampanyeForm />
+      </Isi>
+    </>
   );
 }

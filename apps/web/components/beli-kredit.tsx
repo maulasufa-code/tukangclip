@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { isian, label, tombolGaris, tombolPrimer } from "@/components/ui";
 import { supabaseBrowser } from "@/lib/supabase/client";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -38,7 +39,7 @@ export function BeliKredit() {
   }
 
   return (
-    <form onSubmit={beli} className="mt-4 flex gap-2">
+    <form onSubmit={beli} className="mt-4 flex flex-wrap gap-2">
       <label htmlFor="nominal" className="sr-only">
         Nominal rupiah
       </label>
@@ -46,18 +47,15 @@ export function BeliKredit() {
         id="nominal"
         inputMode="numeric"
         value={nominal}
-        onChange={(e) => setNominal(e.target.value)}
-        className="min-h-[44px] flex-1 rounded-md border border-stone-300 px-3"
+        onChange={(e) => setNominal(e.target.value.replace(/\D/g, ""))}
+        className={`${isian} !mt-0 min-w-0 flex-1`}
       />
-      <button
-        type="submit"
-        disabled={fase === "sibuk"}
-        className="min-h-[44px] rounded-md bg-stone-900 px-5 text-sm text-white disabled:opacity-60"
-      >
-        {fase === "sibuk" ? "Membuat..." : "Beli kredit"}
+      <button type="submit" disabled={fase === "sibuk"} className={tombolPrimer}>
+        {fase === "sibuk" ? "Membuat tagihan..." : "Beli kredit"}
       </button>
+      <p className="w-full text-sm text-stone-700">Minimal Rp10.000.</p>
       {fase === "gagal" && (
-        <p role="alert" className="text-sm text-red-800">
+        <p role="alert" className="w-full text-sm text-red-900">
           {pesan}
         </p>
       )}

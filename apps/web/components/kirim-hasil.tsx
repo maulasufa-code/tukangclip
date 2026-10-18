@@ -52,22 +52,24 @@ export function KirimHasil({ applicationId }: { applicationId: string }) {
   }
 
   return (
-    <div className="mt-2">
-      <label className="block min-h-[44px] cursor-pointer rounded-md border border-dashed border-stone-400 p-4 text-center text-sm">
-        Pilih file hasil MP4
+    <div className="mt-4">
+      <label className="flex min-h-[88px] cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-cl-ink bg-cl-slate p-4 text-center text-sm focus-within:outline focus-within:outline-[3px] focus-within:outline-offset-2 focus-within:outline-[#8a3a00]">
+        <span className="font-medium">{fase === "kerja" ? "Mengunggah dan mengirim..." : "Pilih file klip (MP4)"}</span>
+        <span className="text-cl-ink">Maksimal 2 GB. Kreator akan meninjau klipmu.</span>
         <input
           type="file"
           accept="video/mp4"
+          disabled={fase === "kerja"}
           className="sr-only"
           onChange={(e) => {
             const f = e.target.files?.[0];
             if (f) void kirim(f);
+            e.target.value = "";
           }}
         />
       </label>
-      {fase === "kerja" && <p role="status" className="mt-1 text-sm">Mengunggah dan mengirim...</p>}
-      {fase === "ok" && <p role="status" className="mt-1 text-sm">Terkirim untuk direview.</p>}
-      {fase === "gagal" && <p role="alert" className="mt-1 text-sm text-red-800">{pesan}</p>}
+      {fase === "ok" && <p role="status" className="mt-2 text-sm font-medium">Terkirim untuk direview.</p>}
+      {fase === "gagal" && <p role="alert" className="mt-2 text-sm text-red-900">{pesan}</p>}
     </div>
   );
 }

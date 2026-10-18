@@ -7,8 +7,8 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 gsap.registerPlugin(ScrollTrigger);
 
 /**
- * Animasi masuk pakai GSAP. Elemen tetap terlihat tanpa JS atau saat
- * prefers-reduced-motion aktif, karena animasi hanya dibuat di dalam efek ini.
+ * Animasi masuk pakai GSAP. Elemen tetap terlihat tanpa JS, karena
+ * animasi hanya dibuat di dalam efek ini.
  * Dengan `kata`, yang naik adalah tiap `.cl-word` di dalamnya (lihat Words).
  */
 export function Reveal({
@@ -26,18 +26,22 @@ export function Reveal({
 
   useEffect(() => {
     const el = wadah.current;
-    if (!el || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!el) return;
 
-    const tween = kata
-      ? gsap.from(el.querySelectorAll(".cl-word"), {
+    // revert() mengembalikan gaya awal. Tanpa itu, efek yang dijalankan dua kali (Strict Mode)
+    // membaca posisi tengah animasi sebagai tujuan, dan teks tertinggal tersembunyi.
+    const ctx = gsap.context(() => {
+      if (kata) {
+        gsap.from(el.querySelectorAll(".cl-word"), {
           yPercent: 110,
           duration: 1,
           ease: "power3.out",
           stagger: 0.055,
           delay,
           scrollTrigger: { trigger: el, start: "top 88%", once: true }
-        })
-      : gsap.from(el, {
+        });
+      } else {
+        gsap.from(el, {
           opacity: 0,
           y: 26,
           filter: "blur(8px)",
@@ -46,11 +50,10 @@ export function Reveal({
           delay,
           scrollTrigger: { trigger: el, start: "top 88%", once: true }
         });
+      }
+    }, el);
 
-    return () => {
-      tween.scrollTrigger?.kill();
-      tween.kill();
-    };
+    return () => ctx.revert();
   }, [delay, kata]);
 
   return (

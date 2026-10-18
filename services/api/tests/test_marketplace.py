@@ -171,3 +171,53 @@ def test_submit_requires_accepted():
     c = client_with(store)
     r = c.post("/submissions", json={"applicationId": "a1", "fileR2Key": "x"}, headers=EDITOR)
     assert r.status_code == 400
+
+
+def test_campaign_list_is_public_and_hides_source():
+    store = base_store()
+    store["campaigns"] = [
+        {"id": "c1", "creator_id": "creator-1", "status": "open", "title": "Klip", "source_url": "https://drive/x"}
+    ]
+    c = client_with(store)
+    r = c.get("/campaigns")
+    assert r.status_code == 200, r.text
+    item = r.json()["items"][0]
+    assert item["title"] == "Klip"
+    assert "source_url" not in item and "creator_id" not in item
+
+
+def test_fund_adds_fee_on_top_and_enforces_minimum(monkeypatch):
+    from app import xendit as xenditmod
+
+    store = base_store()
+    store["settings"] = [
+        {"key": "campaign_fee_pct", "value": {"value": 15}},
+        {"key": "min_campaign_topup_idr", "value": {"value": 3000000}},
+    ]
+    store["campaigns"] = [{"id": "c1", "creator_id": "creator-1", "status": "open"}]
+    store["topup_intents"] = []
+    dibayar = []
+    monkeypatch.setattr(
+        xenditmod, "create_invoice", lambda a, e, p=None: dibayar.append(a) or {"id": "x1", "url": "https://pay/x1"}
+    )
+    c = client_with(store)
+
+    kecil = c.post("/campaigns/c1/fund", json={"amount": 1000000}, headers=CREATOR)
+    assert kecil.status_code == 400
+
+    r = c.post("/campaigns/c1/fund", json={"amount": 10000000}, headers=CREATOR)
+    assert r.status_code == 200, r.text
+    assert r.json()["fee"] == 1500000 and r.json()["total"] == 11500000
+    assert dibayar == [11500000]
+    intent = store["topup_intents"][0]
+    # Webhook mengkredit escrow amount - fee, jadi budget utuh.
+    assert intent["amount"] - intent["fee"] == 10000000
+
+
+def test_apply_blocked_after_three_active_projects():
+    c = client_with(base_store())
+    ids = [c.post("/campaigns", json=campaign_payload(), headers=CREATOR).json()["id"] for _ in range(4)]
+    for cid in ids[:3]:
+        assert c.post(f"/campaigns/{cid}/apply", headers=EDITOR).status_code == 200
+    r = c.post(f"/campaigns/{ids[3]}/apply", headers=EDITOR)
+    assert r.status_code == 409 and r.json()["detail"] == "batas-proyek-aktif"

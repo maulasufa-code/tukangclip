@@ -19,9 +19,6 @@ export function SceneBackground() {
     const dc = kanvasTitik.current;
     if (!cv || !dc) return;
 
-    // ?gerak di URL mengabaikan preferensi OS, untuk melihat animasi di mesin yang mematikan animasi.
-    const reduce =
-      matchMedia("(prefers-reduced-motion: reduce)").matches && !new URLSearchParams(location.search).has("gerak");
     const dx = dc.getContext("2d");
     if (!dx) return;
 
@@ -73,7 +70,7 @@ export function SceneBackground() {
         dx!.restore();
       });
 
-      if (mx > -900 && !reduce) {
+      if (mx > -900) {
         const didalam = gelap.some((r) => my > r.top && my < r.bottom);
         if (t - sqt > 2600) {
           sqt = t;
@@ -89,7 +86,7 @@ export function SceneBackground() {
           s.x += (tx - s.x) * (0.06 - i * 0.012);
           s.y += (ty - s.y) * (0.06 - i * 0.012);
           if (didalam) {
-            dx!.fillStyle = "#ff488b";
+            dx!.fillStyle = "#fcc501";
             const z = i === 0 ? 10 : 6;
             dx!.fillRect(s.x - z / 2, s.y - z / 2, z, z);
           }
@@ -120,14 +117,14 @@ export function SceneBackground() {
 
       const scene = new THREE.Scene();
       const kamera = new THREE.PerspectiveCamera(30, 1, 10, 6000);
-      scene.add(new THREE.AmbientLight(0x6a2a66, 1.1));
-      const lampu = new THREE.DirectionalLight(0xff5fae, 1.5);
+      scene.add(new THREE.AmbientLight(0x8a6020, 1.7));
+      const lampu = new THREE.DirectionalLight(0xffc040, 2.4);
       lampu.position.set(-500, 600, 700);
       scene.add(lampu);
-      const titikCahaya = new THREE.PointLight(0xffb8dc, 1.2, 0);
+      const titikCahaya = new THREE.PointLight(0xffe0a0, 1.2, 0);
       titikCahaya.position.set(500, 350, 600);
       scene.add(titikCahaya);
-      const rim = new THREE.DirectionalLight(0x8a2cff, 0.9);
+      const rim = new THREE.DirectionalLight(0xff6a00, 0.9);
       rim.position.set(300, -200, -400);
       scene.add(rim);
 
@@ -136,8 +133,9 @@ export function SceneBackground() {
       const TEBAL = 10;
       const JARAK = 24;
       const R0 = 64;
-      const PUTAR = 9;
-      const R_CINCIN = R0 + JARAK * PUTAR + 22;
+      const PUTAR = 8;
+      const R_CINCIN = R0 + JARAK * (PUTAR + 1);
+      const S_LILIT = 2 * Math.PI * R_CINCIN;
 
       const polar = (r: number, a: number) => [r * Math.cos(a), r * Math.sin(a)];
 
@@ -150,18 +148,6 @@ export function SceneBackground() {
           const r = R0 + (JARAK * th) / (2 * Math.PI);
           o.push(polar(r + TEBAL / 2, th));
           i.push(polar(r - TEBAL / 2, th));
-        }
-        return { o, i };
-      }
-
-      function lingkaran(r: number) {
-        const o: number[][] = [];
-        const i: number[][] = [];
-        const n = 180;
-        for (let k = 0; k <= n; k++) {
-          const a = (k / n) * 2 * Math.PI;
-          o.push(polar(r + TEBAL / 2, a));
-          i.push(polar(r - TEBAL / 2, a));
         }
         return { o, i };
       }
@@ -195,16 +181,16 @@ export function SceneBackground() {
       }
 
       const bahanPotong = new THREE.MeshPhysicalMaterial({
-        color: 0x9a2a86,
-        emissive: 0x3a0c36,
+        color: 0xffc400,
+        emissive: 0x6a4400,
         roughness: 0.42,
         metalness: 0.05,
         clearcoat: 0.5,
         side: THREE.DoubleSide
       });
       const bahanSisi = new THREE.MeshPhysicalMaterial({
-        color: 0x241028,
-        emissive: 0x0e0410,
+        color: 0x241708,
+        emissive: 0x100a02,
         roughness: 0.5,
         metalness: 0.3,
         clearcoat: 0.4,
@@ -218,23 +204,21 @@ export function SceneBackground() {
         return g;
       }
 
-      // Kain film: lubang sprocket di dua tepi, bingkai di tengah.
-      const PANJANG_UBIN = 2 * LEBAR;
+      // Kain film: lubang sprocket di dua tepi, satu bingkai per ubin.
+      const PANJANG_UBIN = LEBAR;
       function tekstur() {
         const c = document.createElement("canvas");
-        c.width = 512;
+        c.width = 256;
         c.height = 256;
         const g = c.getContext("2d")!;
-        g.fillStyle = "#1c0f20";
-        g.fillRect(0, 0, 512, 256);
-        const gr = g.createLinearGradient(0, 0, 512, 0);
-        gr.addColorStop(0, "#43163f");
-        gr.addColorStop(1, "#7a2370");
+        g.fillStyle = "#1a1006";
+        g.fillRect(0, 0, 256, 256);
+        const gr = g.createLinearGradient(0, 0, 256, 0);
+        gr.addColorStop(0, "#7a4e08");
+        gr.addColorStop(1, "#f2b01a");
         g.fillStyle = gr;
-        g.fillRect(24, 48, 464, 160);
-        g.fillStyle = "#1c0f20";
-        g.fillRect(250, 48, 12, 160);
-        for (let k = 0; k < 8; k++) {
+        g.fillRect(14, 48, 228, 160);
+        for (let k = 0; k < 4; k++) {
           g.clearRect(10 + k * 64, 12, 30, 20);
           g.clearRect(10 + k * 64, 224, 30, 20);
         }
@@ -249,53 +233,135 @@ export function SceneBackground() {
         alphaTest: 0.5,
         roughness: 0.55,
         metalness: 0.1,
-        emissive: 0x2a0c2a,
+        emissive: 0x4a3008,
         side: THREE.DoubleSide
       });
 
-      // Ekor film: keluar dari puncak cincin, melengkung ke kiri, dan putus miring.
-      function ekor() {
-        const lengkung = new THREE.CatmullRomCurve3([
-          new THREE.Vector3(0, R_CINCIN, 0),
-          new THREE.Vector3(-170, R_CINCIN + 6, 0),
-          new THREE.Vector3(-340, R_CINCIN - 28, 0),
-          new THREE.Vector3(-480, R_CINCIN - 100, 0),
-          new THREE.Vector3(-570, R_CINCIN - 200, 0)
-        ]);
-        const panjang = lengkung.getLength();
-        const N = 90;
-        const pos: number[] = [];
-        const uv: number[] = [];
-        const idx: number[] = [];
-        for (let k = 0; k <= N; k++) {
-          const tl = k / N;
-          const tr = k === N ? 1 - 0.18 : tl;
-          const pl = lengkung.getPointAt(tl);
-          const pr = lengkung.getPointAt(tr);
-          pos.push(pl.x, pl.y, -LEBAR / 2, pr.x, pr.y, LEBAR / 2);
-          uv.push((tl * panjang) / PANJANG_UBIN, 0, (tr * panjang) / PANJANG_UBIN, 1);
-          if (k < N) {
-            const a = 2 * k;
-            idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
-          }
+      // Film terbentang dari puncak cincin: K potongan sepanjang satu ubin, digambar ulang tiap frame.
+      // Potongan yang menempel jadi satu helai bergelombang. Saat dipotong, celahnya melebar,
+      // potongan tersebar, lalu bergeser berputar di jalur yang sama (loop).
+      const K = 16;
+      const PL = PANJANG_UBIN;
+      const L = K * PL;
+      const BARIS = 14;
+      const PER = (BARIS + 1) * 2;
+      const posAttr = new THREE.BufferAttribute(new Float32Array(K * PER * 3), 3);
+      const uvAttr = new THREE.BufferAttribute(new Float32Array(K * PER * 2), 2);
+      posAttr.setUsage(THREE.DynamicDrawUsage);
+      uvAttr.setUsage(THREE.DynamicDrawUsage);
+      const idx: number[] = [];
+      for (let k = 0; k < K; k++) {
+        for (let j = 0; j < BARIS; j++) {
+          const a = k * PER + 2 * j;
+          idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
         }
-        const g = new THREE.BufferGeometry();
-        g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-        g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
-        g.setIndex(idx);
-        g.computeVertexNormals();
-        return new THREE.Mesh(g, bahanFilm);
+      }
+      const geoFilm = new THREE.BufferGeometry();
+      geoFilm.setAttribute("position", posAttr);
+      geoFilm.setAttribute("uv", uvAttr);
+      geoFilm.setIndex(idx);
+      const filmMesh = new THREE.Mesh(geoFilm, bahanFilm);
+      filmMesh.frustumCulled = false;
+
+      const smooth = (a: number, b: number, x: number) => {
+        const u = Math.min(1, Math.max(0, (x - a) / (b - a)));
+        return u * u * (3 - 2 * u);
+      };
+      const acak = Array.from({ length: K }, (_, k) => [Math.sin(k * 91.7 + 1.3), Math.sin(k * 47.3 + 2.1), Math.sin(k * 13.1 + 0.7)]);
+      const pt = new THREE.Vector3();
+      const pt2 = new THREE.Vector3();
+      const tg = new THREE.Vector3();
+      const sil = new THREE.Vector3();
+      const lebarV = new THREE.Vector3();
+      let wkt = 0;
+      let amp = 1;
+      let p = 0;
+      let shift = 0;
+
+      // Titik di jalur film pada jarak s dari ujung dalam. Satu lilitan pertama membungkus roll,
+      // lalu film keluar dari puncak ke kiri, hampir lurus dan sedikit miring ke bawah.
+      function titik(s: number, out: InstanceType<typeof THREE.Vector3>) {
+        if (s < S_LILIT) {
+          const f = s / S_LILIT;
+          const r = R_CINCIN - 14 * (1 - f);
+          const a = Math.PI / 2 - 2 * Math.PI * (1 - f);
+          out.set(r * Math.cos(a), r * Math.sin(a), 0);
+          return;
+        }
+        const d = s - S_LILIT;
+        const env = smooth(0, 380, d);
+        const x = -d;
+        const y = R_CINCIN - 0.13 * d + env * amp * (24 * Math.sin(0.008 * d - 1.2 * wkt) + 8 * Math.sin(0.02 * d - 2 * wkt + 1));
+        const z = env * amp * 16 * Math.sin(0.006 * d - 1 * wkt + 1);
+        out.set(x, y, z);
       }
 
-      // Roll utama: cincin diam + spiral yang berputar + ekor.
+      function simpul(s: number, tanda: number, dy: number, dz: number, tw: number, half: number, arr: Float32Array, off: number) {
+        titik(s, pt);
+        titik(s + 3, pt2);
+        pt.y += dy;
+        pt.z += dz;
+        pt2.y += dy;
+        pt2.z += dz;
+        tg.subVectors(pt2, pt).normalize();
+        sil.set(0, 0, 1).addScaledVector(tg, -tg.z).normalize();
+        lebarV.crossVectors(tg, sil);
+        const d = Math.max(0, s - S_LILIT);
+        const env = smooth(0, 380, d);
+        const phi = tw + 0.95 * env + 0.25 * env * Math.sin(0.009 * d - 1.3 * wkt + 2);
+        const c = Math.cos(phi) * tanda * half;
+        const n = Math.sin(phi) * tanda * half;
+        arr[off] = pt.x + sil.x * c + lebarV.x * n;
+        arr[off + 1] = pt.y + sil.y * c + lebarV.y * n;
+        arr[off + 2] = pt.z + sil.z * c + lebarV.z * n;
+      }
+
+      const mod = (a: number, b: number) => ((a % b) + b) % b;
+
+      function susunFilm() {
+        const pa = posAttr.array as Float32Array;
+        const ua = uvAttr.array as Float32Array;
+        for (let k = 0; k < K; k++) {
+          const a0 = mod(k * PL + shift, L);
+          const [r1, r2, r3] = acak[k];
+          const tengah = a0 + PL / 2;
+          // Sayatan menjalar dari roll ke ujung: potongan dekat roll terpotong lebih dulu.
+          const dn = Math.min(1, Math.max(0, (tengah - S_LILIT) / (L - S_LILIT)));
+          const ck = Math.min(1, Math.max(0, p * 1.8 - 0.8 * dn));
+          const g = ck * 0.2 * PL * (0.3 + 0.7 * smooth(S_LILIT - 200, S_LILIT + 100, tengah));
+          const sk = ck * 0.3 * PL;
+          const panj = PL - 2 * g;
+          const lepas = ck * smooth(S_LILIT, S_LILIT + 250, tengah);
+          const dy = lepas * 60 * r1;
+          const dz = lepas * 80 * r2;
+          const tw = lepas * 0.9 * r3 * Math.sin(wkt * 1.3 + k);
+          const half = (LEBAR / 2) * (1 + p * (smooth(0, 150, tengah) * smooth(0, 150, L - tengah) - 1));
+          for (let j = 0; j <= BARIS; j++) {
+            const f = j / BARIS;
+            const sL = a0 + g + f * panj;
+            const u = (g + f * panj) / PANJANG_UBIN;
+            const o = k * PER + 2 * j;
+            simpul(sL, -1, dy, dz, tw, half, pa, o * 3);
+            simpul(sL + sk, 1, dy, dz, tw, half, pa, (o + 1) * 3);
+            ua[o * 2] = u;
+            ua[o * 2 + 1] = 0;
+            ua[o * 2 + 2] = u + sk / PANJANG_UBIN;
+            ua[o * 2 + 3] = 1;
+          }
+        }
+        posAttr.needsUpdate = true;
+        uvAttr.needsUpdate = true;
+        geoFilm.computeVertexNormals();
+      }
+      susunFilm();
+
+      // Roll utama: spiral yang berputar, dibungkus film yang sama dengan yang terbentang.
       const roll = new THREE.Group();
       const putarRoll = new THREE.Group();
       const sp = spiral();
       putarRoll.add(irisan(sp.o, sp.i, LEBAR - 6, false));
       roll.add(putarRoll);
-      const ring = lingkaran(R_CINCIN);
-      roll.add(irisan(ring.o, ring.i, LEBAR, true));
-      roll.add(ekor());
+      roll.add(filmMesh);
       scene.add(roll);
 
       // Irisan yang terpisah dari roll, lebih dekat ke kamera.
@@ -324,31 +390,63 @@ export function SceneBackground() {
       ukuranTiga();
       window.addEventListener("resize", ukuranTiga);
 
+      // Tahan tombol mouse atau sentuh di latar hero: film ditarik keluar lebih cepat, roll bergeser ke kanan,
+      // dan film disayat jadi potongan. Lepas: semuanya kembali dengan ease.
+      let tahan = false;
+      let tarikan = 0;
+      let geser = 0;
+      const padaTekan = (e: PointerEvent) => {
+        // Hanya latar hero yang memicu tarikan. Teks, tautan, dan tombol tetap bisa diseleksi dan diklik.
+        const el = e.target as HTMLElement;
+        if (!el.closest('section[aria-labelledby="judul-utama"]') || el.closest("h1,h2,h3,p,span,a,button,input,select,textarea,label,summary,li,svg,[role=button]")) return;
+        tahan = true;
+        document.body.style.userSelect = "none";
+      };
+      const padaLepas = () => {
+        tahan = false;
+        document.body.style.userSelect = "";
+      };
+      window.addEventListener("pointerdown", padaTekan);
+      window.addEventListener("pointerup", padaLepas);
+      window.addEventListener("pointercancel", padaLepas);
+      window.addEventListener("blur", padaLepas);
+
       let gulirHalus = window.scrollY;
       let putar = 0;
       let tAwal = 0;
-
-      const mod = (a: number, b: number) => ((a % b) + b) % b;
 
       function bingkai(t: number) {
         const dt = tAwal ? Math.min((t - tAwal) / 1000, 0.05) : 0;
         tAwal = t;
         const w = window.innerWidth;
         const h = window.innerHeight;
-        const skala = Math.max(0.3, Math.min(1.3, Math.min(w * 0.24, h * 0.3) / R_CINCIN));
+        const skala = Math.max(0.3, Math.min(1.3, Math.min(w * 0.22, h * 0.27) / R_CINCIN));
 
         const sebelum = gulirHalus;
-        gulirHalus = reduce ? 0 : gulirHalus + (window.scrollY - gulirHalus) * Math.min(1, dt * 7);
+        gulirHalus += (window.scrollY - gulirHalus) * Math.min(1, dt * 7);
         const kecepatan = dt ? Math.abs(gulirHalus - sebelum) / dt : 0;
-        const laju = 0.16 + Math.min(kecepatan, 3000) * 0.0006;
+        const laju = 0.16 + Math.min(kecepatan, 3000) * 0.0006 + tarikan * 3;
         putar += dt * laju;
 
         // Roll jauh: naik pelan, miring mengikuti scroll.
-        roll.position.set(w * 0.14, h * 0.15 + gulirHalus * 0.2, -150);
+        roll.position.set(w * (0.16 + geser * 0.13), h * 0.06 + gulirHalus * 0.2, -150);
         roll.scale.setScalar(skala);
-        roll.rotation.set(0.42 + myn * 0.06 + gulirHalus * 0.00012, -0.55 + mxn * 0.1 + gulirHalus * 0.0002, 0.04);
+        roll.rotation.set(0.3 + myn * 0.06 + gulirHalus * 0.00012, -0.28 + mxn * 0.1 + gulirHalus * 0.0002, 0.04);
         putarRoll.rotation.z = putar;
-        ubin.offset.x -= (dt * laju * R_CINCIN) / PANJANG_UBIN;
+        ubin.offset.x -= (dt * laju * R_CINCIN * (1 - p)) / PANJANG_UBIN;
+        roll.updateMatrixWorld();
+        wkt += dt * (1 + tarikan * 3.5);
+        amp = 1 + tarikan * 1.2;
+
+        tarikan += ((tahan ? 1 : 0) - tarikan) * Math.min(1, dt * (tahan ? 3.5 : 2.2));
+        geser += (tarikan - geser) * Math.min(1, dt * 1.6);
+        p += ((tahan ? 1 : 0) - p) * Math.min(1, dt * (tahan ? 1.5 : 2.2));
+        if (tahan) {
+          shift += dt * laju * R_CINCIN * p;
+        } else {
+          shift += (Math.round(shift / PL) * PL - shift) * Math.min(1, dt * 4);
+        }
+        susunFilm();
 
         // Irisan dekat: melintas lebih cepat dan berulang tiap beberapa layar.
         const rentang = h + skala * 700;
@@ -364,31 +462,31 @@ export function SceneBackground() {
         renderer.render(scene, kamera);
       }
 
-      if (reduce) {
-        gambar(0);
-      } else {
-        renderer.setAnimationLoop(gambar);
-      }
+      renderer.setAnimationLoop(gambar);
 
       berhenti = () => {
         renderer.setAnimationLoop(null);
         renderer.dispose();
         window.removeEventListener("resize", ukuranTiga);
         window.removeEventListener("pointermove", padaKursor);
+        window.removeEventListener("pointerdown", padaTekan);
+        window.removeEventListener("pointerup", padaLepas);
+        window.removeEventListener("pointercancel", padaLepas);
+        window.removeEventListener("blur", padaLepas);
+        document.body.style.userSelect = "";
       };
     }
 
     function loop(t: number) {
       if (dibatalkan) return;
       gambarTitik(t);
-      if (!reduce) requestAnimationFrame(loop);
+      requestAnimationFrame(loop);
     }
 
     mulaiTiga().catch(() => {
       // Tanpa WebGPU maupun WebGL, latar titik tetap jalan.
     });
-    if (reduce) gambarTitik(0);
-    else requestAnimationFrame(loop);
+    requestAnimationFrame(loop);
 
     return () => {
       dibatalkan = true;
@@ -405,7 +503,7 @@ export function SceneBackground() {
         className="fixed inset-0 -z-30"
         style={{
           background:
-            "radial-gradient(70% 55% at 50% 105%,rgba(120,20,95,.55),transparent 70%),radial-gradient(60% 50% at 85% 30%,rgba(70,10,70,.45),transparent 70%),linear-gradient(#000,#07030b)"
+            "radial-gradient(70% 55% at 50% 105%,rgba(190,100,0,.5),transparent 70%),radial-gradient(60% 50% at 85% 30%,rgba(120,70,0,.4),transparent 70%),linear-gradient(#000,#0d0803)"
         }}
       />
       <canvas ref={kanvasGl} aria-hidden="true" className="pointer-events-none fixed inset-0 -z-20 h-full w-full" />

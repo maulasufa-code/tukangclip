@@ -2,19 +2,21 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { Logo } from "@/components/logo";
 
 const tautan = [
-  { href: "#cara-kerja", label: "Cara kerja" },
-  { href: "#peran", label: "Peran" },
-  { href: "#keamanan", label: "Keamanan" },
-  { href: "#status", label: "Status" }
+  { href: "#alur", label: "Alur" },
+  { href: "#harga", label: "Harga" },
+  { href: "/jelajah", label: "Kampanye" },
+  { href: "#clipper", label: "Clipper" },
+  { href: "#faq", label: "FAQ" }
 ];
 
 /**
  * Header sembunyi saat turun dan muncul lagi saat naik. Warnanya berganti
  * saat berada di atas panel terang, supaya teks tetap terbaca.
  */
-export function HeaderNav() {
+export function HeaderNav({ sudahMasuk }: { sudahMasuk: boolean }) {
   const [sembunyi, setSembunyi] = useState(false);
   const [terang, setTerang] = useState(false);
   const header = useRef<HTMLElement>(null);
@@ -61,7 +63,7 @@ export function HeaderNav() {
           href="/"
           className={`flex min-h-[44px] items-center gap-2.5 text-[19px] tracking-[-0.01em] ${terang ? "text-cl-ink" : "text-white"}`}
         >
-          <Penanda terang={terang} />
+          <Logo className={`h-[22px] w-auto ${terang ? "text-cl-ink" : "text-cl-accent"}`} />
           TukangClip
         </Link>
 
@@ -86,32 +88,31 @@ export function HeaderNav() {
               ))}
             </ul>
           </nav>
-          <Link
-            href="/masuk"
-            className="hidden min-h-[44px] items-center justify-center rounded-[7px] bg-cl-slate px-4 font-mono text-xs uppercase text-cl-ink transition-transform hover:-translate-y-0.5 sm:inline-flex"
-          >
-            Masuk
-          </Link>
-          <Link
-            href="/daftar"
-            className="inline-flex min-h-[44px] items-center justify-center rounded-[7px] bg-cl-accent px-4 font-mono text-xs uppercase text-cl-accent-ink transition-transform hover:-translate-y-0.5 hover:bg-cl-accent-hi"
-          >
-            Buat akun
-          </Link>
+          {sudahMasuk ? (
+            <Link
+              href="/dasbor"
+              className="inline-flex min-h-[44px] items-center justify-center rounded-[7px] bg-cl-accent px-4 font-mono text-xs uppercase text-cl-accent-ink transition-transform hover:-translate-y-0.5 hover:bg-cl-accent-hi"
+            >
+              Dasbor
+            </Link>
+          ) : (
+            <>
+              <Link
+                href="/masuk"
+                className="hidden min-h-[44px] items-center justify-center rounded-[7px] bg-cl-slate px-4 font-mono text-xs uppercase text-cl-ink transition-transform hover:-translate-y-0.5 sm:inline-flex"
+              >
+                Masuk
+              </Link>
+              <Link
+                href="/daftar"
+                className="inline-flex min-h-[44px] items-center justify-center rounded-[7px] bg-cl-accent px-4 font-mono text-xs uppercase text-cl-accent-ink transition-transform hover:-translate-y-0.5 hover:bg-cl-accent-hi"
+              >
+                Buat akun
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </header>
-  );
-}
-
-function Penanda({ terang }: { terang: boolean }) {
-  const warna = terang ? "bg-cl-ink" : "bg-cl-accent";
-  const tinggi = ["h-[6px]", "h-4", "h-[11px]", "h-[6px]"];
-  return (
-    <span aria-hidden="true" className="flex items-center gap-[2.5px] h-[18px]">
-      {tinggi.map((t, i) => (
-        <i key={i} className={`block w-[3px] rounded-[1px] ${t} ${warna}`} />
-      ))}
-    </span>
   );
 }

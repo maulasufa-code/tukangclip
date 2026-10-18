@@ -30,10 +30,12 @@ export function StepList({ items }: { items: string[] }) {
           key={t}
           aria-current={i === aktif ? "step" : undefined}
           className={`py-px transition-colors duration-500 ${
-            i === aktif ? "text-cl-ink" : "text-[#5a6a94]"
-          } ${i === 0 ? "font-normal" : ""} max-[980px]:text-cl-ink`}
+            i === aktif ? "text-cl-ink" : "text-[#5c4300]"
+          } ${i === aktif ? "font-normal" : ""} max-[980px]:text-cl-ink`}
         >
-          {t}
+          <a href={`#langkah-${i}`} className="block rounded-sm hover:text-cl-rust focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cl-ink">
+            {t}
+          </a>
         </li>
       ))}
     </ol>

@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { isian, label, tombolGaris, tombolPrimer } from "@/components/ui";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { MINIMAL_RATE } from "@/lib/harga";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -24,6 +26,11 @@ export function KampanyeForm() {
     if (!API) {
       setFase("gagal");
       setPesan("API backend belum dikonfigurasi.");
+      return;
+    }
+    if (Number(form.ratePer1000) < MINIMAL_RATE) {
+      setFase("gagal");
+      setPesan(`Rate minimal Rp${MINIMAL_RATE.toLocaleString("id-ID")} per 1.000 views.`);
       return;
     }
     setFase("sibuk");
@@ -53,38 +60,38 @@ export function KampanyeForm() {
     router.push(`/kampanye/${out.id}`);
   }
 
-  const field = "mt-1 w-full min-h-[44px] rounded-md border border-stone-300 px-3";
+  const field = isian;
 
   return (
     <form onSubmit={kirim} className="mt-6 space-y-4">
       <div>
-        <label htmlFor="judul" className="block text-sm font-medium">Judul kampanye</label>
+        <label htmlFor="judul" className={label}>Judul kampanye</label>
         <input id="judul" required minLength={4} maxLength={120} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className={field} />
       </div>
       <div>
-        <label htmlFor="brief" className="block text-sm font-medium">Brief untuk editor</label>
-        <textarea id="brief" rows={3} value={form.brief} onChange={(e) => setForm({ ...form, brief: e.target.value })} className="w-full rounded-md border border-stone-300 px-3 py-2" />
+        <label htmlFor="brief" className={label}>Brief untuk clipper</label>
+        <textarea id="brief" rows={3} value={form.brief} onChange={(e) => setForm({ ...form, brief: e.target.value })} className={`${isian} py-2`} />
       </div>
       <div>
-        <label htmlFor="sumber" className="block text-sm font-medium">Link video mentah (Drive atau YouTube)</label>
+        <label htmlFor="sumber" className={label}>Link video mentah (Drive atau YouTube)</label>
         <input id="sumber" type="url" value={form.sourceUrl} onChange={(e) => setForm({ ...form, sourceUrl: e.target.value })} className={field} placeholder="https://" />
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div>
-          <label htmlFor="budget" className="block text-sm font-medium">Budget (Rp)</label>
+          <label htmlFor="budget" className={label}>Budget (Rp)</label>
           <input id="budget" inputMode="numeric" required value={form.budgetTotal} onChange={(e) => setForm({ ...form, budgetTotal: e.target.value })} className={field} />
         </div>
         <div>
-          <label htmlFor="rate" className="block text-sm font-medium">Rp per 1.000 views</label>
-          <input id="rate" inputMode="numeric" required value={form.ratePer1000} onChange={(e) => setForm({ ...form, ratePer1000: e.target.value })} className={field} />
+          <label htmlFor="rate" className={label}>Rp per 1.000 views</label>
+          <input id="rate" inputMode="numeric" required value={form.ratePer1000} onChange={(e) => setForm({ ...form, ratePer1000: e.target.value.replace(/\D/g, "").replace(/^0+/, "") })} className={field} />
         </div>
         <div>
-          <label htmlFor="cap" className="block text-sm font-medium">Maks per klip (Rp)</label>
+          <label htmlFor="cap" className={label}>Maks per klip (Rp)</label>
           <input id="cap" inputMode="numeric" required value={form.capPerClip} onChange={(e) => setForm({ ...form, capPerClip: e.target.value })} className={field} />
         </div>
       </div>
-      {fase === "gagal" && <p role="alert" className="text-sm text-red-800">{pesan}</p>}
-      <button type="submit" disabled={fase === "sibuk"} className="min-h-[44px] w-full rounded-md bg-stone-900 px-4 py-3 text-sm text-white disabled:opacity-60">
+      {fase === "gagal" && <p role="alert" className="text-sm text-red-900">{pesan}</p>}
+      <button type="submit" disabled={fase === "sibuk"} className={tombolPrimer}>
         {fase === "sibuk" ? "Menyimpan..." : "Buka kampanye"}
       </button>
     </form>

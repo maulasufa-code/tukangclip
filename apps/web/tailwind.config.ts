@@ -5,22 +5,34 @@ export default {
     extend: {
       colors: {
         // Token halaman aplikasi, dipakai apa adanya sejak Fase 1.
-        tinta: "#1c1917",
-        kertas: "#fafaf9",
-        aksen: "#b45309",
+        tinta: "#1f1400",
+        kertas: "#fff9e6",
+        aksen: "#8a3a00",
         // Token landing. Nilai dan arah visual ada di DESIGN.md.
         cl: {
-          bg: "#050208",
-          night: "#101421",
-          paper: "#ffffff",
-          slate: "#eef2f5",
-          ink: "#172b76",
-          "ink-soft": "#8e99c4",
-          muted: "#c9bdd6",
-          accent: "#ff488b",
-          "accent-hi": "#ff6aa2",
-          "accent-ink": "#1a0610",
-          seg: "#59679a"
+          bg: "#0d0803",
+          night: "#1b1308",
+          paper: "#fffdf6",
+          slate: "#fff0b8",
+          sun: "#fcc501",
+          ink: "#1f1400",
+          "ink-soft": "#7a5a00",
+          muted: "#dccdae",
+          accent: "#fcc501",
+          "accent-hi": "#ffd84a",
+          "accent-ink": "#1f1400",
+          orange: "#ff8a1f",
+          rust: "#7a3300",
+          seg: "#3a2a00"
+        },
+        // Netral hangat untuk halaman aplikasi: border dan teks sekunder condong ke kuning.
+        stone: {
+          200: "#f1e3b4",
+          300: "#b08a35",
+          400: "#8f7020",
+          600: "#6b5200",
+          700: "#4a3600",
+          900: "#1f1400"
         }
       },
       fontFamily: {

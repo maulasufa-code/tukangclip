@@ -8,10 +8,10 @@ test.describe("landing desktop", () => {
     page.on("pageerror", (e) => error.push(e.message));
 
     await page.goto("/");
-    await expect(page.locator("h1")).toContainText("Video panjang masuk");
+    await expect(page.locator("h1")).toContainText("Satu video panjang");
     await expect(page.locator("canvas").first()).toBeAttached();
 
-    for (const href of ["#cara-kerja", "#peran", "#keamanan", "#status"]) {
+    for (const href of ["#alur", "#harga", "#clipper", "#faq"]) {
       await expect(page.locator(`a[href="${href}"]`).first()).toBeVisible();
       await expect(page.locator(href)).toHaveCount(1);
     }

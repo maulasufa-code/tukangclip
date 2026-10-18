@@ -1,37 +1,60 @@
 import { redirect } from "next/navigation";
-import { supabaseServer } from "@/lib/supabase/server";
+import { ambilPengguna } from "@/lib/sesi";
 import { apiGet } from "@/lib/api";
 import { SambungButtons } from "@/components/sambung-buttons";
+import { Chip, Isi, Judul2, KepalaHalaman, Kosong, kartu } from "@/components/ui";
+
+export const dynamic = "force-dynamic";
+
+const NAMA_PLATFORM: Record<string, string> = { youtube: "YouTube", tiktok: "TikTok", meta: "Instagram" };
 
 export default async function AkunPage() {
-  const supabase = supabaseServer();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/masuk?next=/akun");
+  const pengguna = await ambilPengguna();
+  if (!pengguna) redirect("/masuk?next=/akun");
   const data = await apiGet("/social");
+  const daftar: { platform: string; account_name: string }[] = data?.items ?? [];
 
   return (
-    <section aria-labelledby="judul-akun">
-      <h1 id="judul-akun" className="text-2xl font-bold">Akun media sosial</h1>
-      <p className="mt-2 text-sm text-stone-700">
-        Klip organic diposting dari akunmu agar views terbaca resmi.
-      </p>
-      <div className="mt-4">
-        <SambungButtons />
-      </div>
-      <h2 className="mt-6 font-semibold">Tersambung</h2>
-      {!data || data.items.length === 0 ? (
-        <p className="mt-2 text-sm text-stone-600">Belum ada akun tersambung.</p>
-      ) : (
-        <ul className="mt-2 space-y-2 text-sm">
-          {data.items.map((s: { platform: string; account_name: string }) => (
-            <li key={s.platform} className="rounded-md border border-stone-200 p-3">
-              {s.platform} {s.account_name ? `· ${s.account_name}` : ""}
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+    <>
+      <KepalaHalaman
+        id="judul-akun"
+        penanda="Akun media sosial"
+        judul="Sambungkan akun tempat klip tayang"
+        deskripsi="Klip organik diposting dari akunmu sendiri agar views terbaca resmi."
+      />
+      <Isi className="max-w-3xl space-y-12">
+        <section aria-labelledby="judul-sambung">
+          <Judul2 id="judul-sambung">Sambungkan akun</Judul2>
+          <div className="mt-4">
+            <SambungButtons />
+          </div>
+        </section>
+
+        <section aria-labelledby="judul-tersambung">
+          <Judul2 id="judul-tersambung">Tersambung</Judul2>
+          {!data ? (
+            <div className="mt-4">
+              <Kosong gagal>Daftar akun belum bisa dimuat karena API backend tidak tersambung.</Kosong>
+            </div>
+          ) : daftar.length === 0 ? (
+            <div className="mt-4">
+              <Kosong>Belum ada akun tersambung. Pilih YouTube di atas untuk memulai.</Kosong>
+            </div>
+          ) : (
+            <ul className={`${kartu} mt-4 divide-y divide-stone-200`}>
+              {daftar.map((s) => (
+                <li key={s.platform} className="flex items-center justify-between gap-4 p-4">
+                  <span className="font-medium">
+                    {NAMA_PLATFORM[s.platform] ?? s.platform}
+                    {s.account_name && <span className="font-normal text-stone-700"> · {s.account_name}</span>}
+                  </span>
+                  <Chip nada="aktif">Tersambung</Chip>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </Isi>
+    </>
   );
 }

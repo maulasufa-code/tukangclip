@@ -70,25 +70,26 @@ export function UploadDropzone() {
 
   return (
     <div>
-      <label
-        htmlFor="berkas"
-        className="block min-h-[44px] cursor-pointer rounded-md border border-dashed border-stone-400 p-6 text-center"
-      >
-        <span className="block font-medium">Pilih file MP4</span>
-        <span className="mt-1 block text-sm text-stone-700">
-          Klik untuk pilih dari perangkat. Maks 2 GB.
-        </span>
-      </label>
       <input
         id="berkas"
         type="file"
         accept="video/mp4"
-        className="sr-only"
+        className="peer sr-only"
         onChange={(e) => {
           const f = e.target.files?.[0];
           if (f) void pilih(f);
+          e.target.value = "";
         }}
       />
+      <label
+        htmlFor="berkas"
+        className="block min-h-[44px] cursor-pointer rounded-lg border-2 border-dashed border-cl-ink bg-cl-slate p-8 text-center transition-transform hover:-translate-y-0.5 peer-focus-visible:outline peer-focus-visible:outline-[3px] peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[#8a3a00]"
+      >
+        <span className="block font-display text-2xl font-light">Pilih file MP4</span>
+        <span className="mt-2 block text-sm text-cl-ink">
+          Klik untuk memilih dari perangkat. Maksimal 2 GB.
+        </span>
+      </label>
       {fase === "unggah" && (
         <p role="status" className="mt-3 text-sm">
           Mengunggah... {persen}%
@@ -105,16 +106,16 @@ export function UploadDropzone() {
         </p>
       )}
       {fase === "selesai" && (
-        <div role="status" className="mt-3 rounded-md border p-4 text-sm">
+        <div role="status" className="mt-3 rounded-lg border-2 border-cl-ink bg-white p-4 text-sm">
           Berhasil masuk antrean. Pantau di{" "}
-          <a href="/dasbor" className="underline">
+          <a href="/dasbor" className="font-medium underline underline-offset-4">
             dasbor
           </a>
           .
         </div>
       )}
       {fase === "gagal" && (
-        <p role="alert" className="mt-3 text-sm text-red-800">
+        <p role="alert" className="mt-3 text-sm text-red-900">
           {pesan}
         </p>
       )}
