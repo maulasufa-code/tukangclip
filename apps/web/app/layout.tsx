@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Archivo, DM_Mono, Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
 import { SmoothScroll } from "@/components/smooth-scroll";
+import { SesiSegar } from "@/components/sesi-segar";
 
 const archivo = Archivo({
   subsets: ["latin"],
@@ -44,6 +45,7 @@ export default function RootLayout({
           Lewati ke isi
         </a>
         <SmoothScroll />
+        <SesiSegar />
         {children}
       </body>
     </html>
