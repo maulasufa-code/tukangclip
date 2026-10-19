@@ -3,6 +3,7 @@ import { Archivo, DM_Mono, Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
 import { SmoothScroll } from "@/components/smooth-scroll";
 import { SesiSegar } from "@/components/sesi-segar";
+import { ReflowAnimasi } from "@/components/reflow-animasi";
 
 const archivo = Archivo({
   subsets: ["latin"],
@@ -46,6 +47,7 @@ export default function RootLayout({
         </a>
         <SmoothScroll />
         <SesiSegar />
+        <ReflowAnimasi />
         {children}
       </body>
     </html>
