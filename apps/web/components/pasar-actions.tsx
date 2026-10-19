@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { BIAYA_PLATFORM_PERSEN, MINIMAL_TOPUP, rincianTopup, rupiah } from "@/lib/harga";
+import { bayarLewatSnap } from "@/lib/snap";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { isian, tombolBahaya, tombolGaris, tombolPrimer, tombolSekunder } from "@/components/ui";
 
@@ -18,7 +19,7 @@ const PESAN: Record<string, string> = {
   "belum-disetujui": "Klip harus disetujui kreator dulu.",
   "lamaran-belum-diterima": "Lamaranmu belum diterima.",
   "belum-tayang": "Klip belum tayang.",
-  "tersangkut-sengketa": "Klip masih tersangkut sengketa.",
+  "tersangkut-sengketa": "Klip masih ditahan karena laporan.",
   "tidak-ditemukan": "Data tidak ditemukan."
 };
 
@@ -119,65 +120,61 @@ export function PutusanButtons({ appId }: { appId: string }) {
 
 export function ReviewButtons({ subId }: { subId: string }) {
   const { sibuk, pesan, jalan } = useAksi();
-  const nilai = (approve: boolean) =>
-    jalan(() => call(`/submissions/${subId}/review`, "POST", { approve }));
+  const [mode, setMode] = useState<"" | "revision" | "decline">("");
+  const [alasan, setAlasan] = useState("");
+  const kirim = (decision: "approve" | "revision" | "decline") =>
+    jalan(
+      () => call(`/submissions/${subId}/review`, "POST", { decision, note: alasan.trim() }),
+      () => {
+        setMode("");
+        setAlasan("");
+      }
+    );
   return (
     <div>
-      <div className="flex gap-2">
-        <button disabled={sibuk} onClick={() => nilai(true)} className={tombolPrimer}>
-          Setujui
-        </button>
-        <button disabled={sibuk} onClick={() => nilai(false)} className={tombolBahaya}>
-          Tolak
-        </button>
-      </div>
+      {mode === "" ? (
+        <div className="flex flex-wrap gap-2">
+          <button disabled={sibuk} onClick={() => kirim("approve")} className={tombolPrimer}>
+            Setujui
+          </button>
+          <button disabled={sibuk} onClick={() => setMode("revision")} className={tombolSekunder}>
+            Minta revisi
+          </button>
+          <button disabled={sibuk} onClick={() => setMode("decline")} className={tombolBahaya}>
+            Tolak
+          </button>
+        </div>
+      ) : (
+        <form
+          className="flex flex-wrap gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            kirim(mode);
+          }}
+        >
+          <input
+            required
+            aria-label={mode === "revision" ? "Alasan revisi" : "Alasan penolakan"}
+            placeholder={mode === "revision" ? "Apa yang perlu diperbaiki?" : "Kenapa klip ini ditolak?"}
+            value={alasan}
+            onChange={(e) => setAlasan(e.target.value)}
+            className="min-h-[44px] min-w-0 flex-1 rounded-[7px] border-2 border-stone-300 bg-white px-3"
+          />
+          <button disabled={sibuk} className={mode === "revision" ? tombolPrimer : tombolBahaya}>
+            {mode === "revision" ? "Kirim revisi" : "Kirim penolakan"}
+          </button>
+          <button type="button" onClick={() => setMode("")} className={tombolSekunder}>
+            Batal
+          </button>
+        </form>
+      )}
       <Galat pesan={pesan} />
     </div>
   );
 }
 
-export function TandaiPosted({ subId }: { subId: string }) {
-  const { sibuk, pesan, jalan } = useAksi();
-  const [url, setUrl] = useState("");
-  const [platform, setPlatform] = useState("youtube");
-  return (
-    <form
-      className="mt-3"
-      onSubmit={(e) => {
-        e.preventDefault();
-        void jalan(() => call(`/submissions/${subId}/posted`, "POST", { url, platform }));
-      }}
-    >
-      <div className="flex flex-wrap gap-2">
-        <select
-          aria-label="Platform tempat klip tayang"
-          value={platform}
-          onChange={(e) => setPlatform(e.target.value)}
-          className="min-h-[44px] rounded-[7px] border-2 border-stone-300 bg-white px-3"
-        >
-          <option value="youtube">YouTube</option>
-          <option value="tiktok">TikTok</option>
-          <option value="instagram">Instagram</option>
-        </select>
-        <input
-          required
-          type="url"
-          aria-label="URL klip tayang"
-          placeholder="https://..."
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          className="min-h-[44px] min-w-0 flex-1 rounded-[7px] border-2 border-stone-300 bg-white px-3"
-        />
-        <button disabled={sibuk} className={tombolSekunder}>
-          Tandai tayang
-        </button>
-      </div>
-      <Galat pesan={pesan} />
-    </form>
-  );
-}
-
 export function DanaiButton({ campaignId }: { campaignId: string }) {
+  const router = useRouter();
   const [nominal, setNominal] = useState("");
   const { sibuk, pesan, jalan } = useAksi();
   const [lokal, setLokal] = useState("");
@@ -196,7 +193,8 @@ export function DanaiButton({ campaignId }: { campaignId: string }) {
           setLokal("");
           void jalan(async () => {
             const o = await call(`/campaigns/${campaignId}/fund`, "POST", { amount: r.budget });
-            window.location.href = o.payUrl as string;
+            const hasil = await bayarLewatSnap(o.snapToken as string);
+            if (hasil === "sukses" || hasil === "menunggu") router.refresh();
           });
         }}
       >
@@ -209,7 +207,7 @@ export function DanaiButton({ campaignId }: { campaignId: string }) {
           className={`${isian} !mt-0 min-w-0 flex-1`}
         />
         <button disabled={sibuk} className={tombolPrimer}>
-          {sibuk ? "Membuat tagihan..." : "Danai via Xendit"}
+          {sibuk ? "Membuka pembayaran..." : "Danai via Midtrans"}
         </button>
       </form>
       <Galat pesan={lokal || pesan} />
@@ -231,7 +229,7 @@ export function SengketaBox({ subId, flagged, mine }: { subId: string; flagged: 
     <div className="mt-3 text-sm">
       {flagged && (
         <p role="alert" className="font-medium text-red-900">
-          Ditandai: perlu pemeriksaan views.
+          Ditandai: perlu pemeriksaan views. Pencairan ditahan sampai diperiksa.
         </p>
       )}
       {!terbuka ? (
@@ -241,7 +239,7 @@ export function SengketaBox({ subId, flagged, mine }: { subId: string; flagged: 
             onClick={() => setTerbuka(true)}
             className="inline-flex min-h-[44px] items-center text-stone-700 underline underline-offset-4"
           >
-            Ajukan sengketa
+            Laporkan masalah
           </button>
           {mine && flagged && (
             <button
@@ -250,7 +248,7 @@ export function SengketaBox({ subId, flagged, mine }: { subId: string; flagged: 
               onClick={() => jalan(() => call(`/submissions/${subId}/dispute/resolve`, "POST", { clear: true }))}
               className={tombolSekunder}
             >
-              Pulihkan
+              Hapus tanda
             </button>
           )}
         </div>
@@ -267,14 +265,14 @@ export function SengketaBox({ subId, flagged, mine }: { subId: string; flagged: 
         >
           <input
             required
-            aria-label="Catatan sengketa"
-            placeholder="Alasan sengketa"
+            aria-label="Isi laporan"
+            placeholder="Jelaskan masalahnya, misalnya views tidak wajar"
             value={catatan}
             onChange={(e) => setCatatan(e.target.value)}
             className="min-h-[44px] min-w-0 flex-1 rounded-[7px] border-2 border-stone-300 bg-white px-3"
           />
           <button disabled={sibuk} className={tombolBahaya}>
-            Kirim sengketa
+            Kirim laporan
           </button>
           <button type="button" onClick={() => setTerbuka(false)} className={tombolSekunder}>
             Batal
@@ -286,49 +284,22 @@ export function SengketaBox({ subId, flagged, mine }: { subId: string; flagged: 
   );
 }
 
-export function TerbitButton({ subId }: { subId: string }) {
+/** Hapus klip yang belum diputuskan. Klip yang sudah disetujui atau ditolak tidak bisa dihapus. */
+export function HapusKlip({ subId }: { subId: string }) {
   const { sibuk, pesan, jalan } = useAksi();
   return (
-    <div className="mt-3">
-      <button
-        disabled={sibuk}
-        onClick={() => jalan(() => call(`/submissions/${subId}/publish`, "POST", { platform: "youtube" }))}
-        className={tombolPrimer}
-      >
-        {sibuk ? "Menerbitkan..." : "Terbitkan ke YouTube"}
-      </button>
-      <Galat pesan={pesan} />
-    </div>
-  );
-}
-
-/** Putar klip yang dikirim clipper lewat tautan sementara dari backend. */
-export function LihatKlip({ subId }: { subId: string }) {
-  const [url, setUrl] = useState("");
-  const [sibuk, setSibuk] = useState(false);
-  const [pesan, setPesan] = useState("");
-  if (url) {
-    return <video src={url} controls className="mt-3 max-h-[420px] w-full rounded-[7px] bg-black" />;
-  }
-  return (
-    <div className="mt-3">
+    <div>
       <button
         type="button"
         disabled={sibuk}
-        onClick={async () => {
-          setSibuk(true);
-          setPesan("");
-          try {
-            setUrl(((await call(`/submissions/${subId}/file`, "GET")) as { url: string }).url);
-          } catch (e) {
-            setPesan(e instanceof Error ? e.message : "Klip belum bisa dibuka.");
-          } finally {
-            setSibuk(false);
+        onClick={() => {
+          if (window.confirm("Hapus klip ini? Tautannya juga ikut dihapus.")) {
+            void jalan(() => call(`/submissions/${subId}`, "DELETE"));
           }
         }}
-        className={tombolSekunder}
+        className={tombolBahaya}
       >
-        {sibuk ? "Membuka..." : "Putar klip"}
+        {sibuk ? "Menghapus..." : "Hapus klip"}
       </button>
       <Galat pesan={pesan} />
     </div>

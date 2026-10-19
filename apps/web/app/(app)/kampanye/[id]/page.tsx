@@ -2,16 +2,8 @@ import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { apiGet } from "@/lib/api";
 import { rupiah } from "@/lib/harga";
-import {
-  DanaiButton,
-  LamarButton,
-  LihatKlip,
-  PutusanButtons,
-  ReviewButtons,
-  SengketaBox,
-  TandaiPosted,
-  TerbitButton
-} from "@/components/pasar-actions";
+import { DanaiButton, HapusKlip, LamarButton, PutusanButtons, ReviewButtons, SengketaBox } from "@/components/pasar-actions";
+import { KirimHasil } from "@/components/kirim-hasil";
 import { Chip, Isi, Judul2, KepalaHalaman, Kosong, angka, kartu, sisaWaktu, tanggal } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -29,9 +21,23 @@ interface Sub {
   application_id: string;
   status: string;
   file_r2_key: string;
-  posted_url?: string | null;
+  posted_links?: { platform: string; url: string }[] | null;
+  review_note?: string;
   flagged?: boolean;
 }
+
+type VideoSaya = {
+  submission_id: string;
+  platform: string;
+  url: string;
+  judul: string;
+  diunggah: string | null;
+  views: number;
+  likes: number;
+  comments: number;
+};
+
+const NAMA_PLATFORM: Record<string, string> = { youtube: "YouTube", tiktok: "TikTok", instagram: "Instagram" };
 
 const LABEL_LAMARAN: Record<string, string> = {
   applied: "Menunggu",
@@ -42,12 +48,12 @@ const LABEL_LAMARAN: Record<string, string> = {
 };
 
 const LABEL_KLIP: Record<string, string> = {
-  draft: "Draf",
-  submitted: "Menunggu review",
+  draft: "Perlu revisi",
+  submitted: "Menunggu keputusan",
   approved: "Disetujui",
   rejected: "Ditolak",
-  posted: "Tayang",
-  tracking: "Dilacak",
+  posted: "Disetujui",
+  tracking: "Disetujui",
   paid_out: "Dibayar"
 };
 
@@ -78,17 +84,19 @@ export default async function KampanyePage({ params }: { params: { id: string } 
 
   const mine = c.creator_id === user.id;
   const apps = c.applications as App[];
-  const [subs, stat, klipSaya] = await Promise.all([
+  const [subs, stat, klipSaya, videoSaya] = await Promise.all([
     mine ? apiGet(`/campaigns/${params.id}/submissions`).catch(() => null) : null,
     mine ? apiGet(`/campaigns/${params.id}/analytics`).catch(() => null) : null,
     !mine && apps.length
-      ? supabase.from("submissions").select("id,application_id,status,posted_url,file_r2_key").in("application_id", apps.map((a) => a.id))
-      : null
+      ? supabase.from("submissions").select("id,application_id,status,posted_links,file_r2_key,review_note").in("application_id", apps.map((a) => a.id))
+      : null,
+    !mine && apps.length ? apiGet("/analytics").catch(() => null) : null
   ]);
+  const videoKlipku = ((videoSaya as { videos?: VideoSaya[] } | null)?.videos ?? []);
   const milikku = apps[0];
   const klipku = ((klipSaya?.data ?? []) as Sub[]);
   const namaPelamar = new Map(apps.map((a) => [a.id, a.editor_name || "Clipper"]));
-  const sisa = Math.round(((c.budget_remaining as number) / (c.budget_total as number)) * 100) || 0;
+  const terpakai = Math.round((((c.budget_total as number) - (c.budget_remaining as number)) / (c.budget_total as number)) * 100) || 0;
   const tenggat = milikku?.status === "accepted" ? sisaWaktu(milikku.due_at) : null;
 
   return (
@@ -113,11 +121,6 @@ export default async function KampanyePage({ params }: { params: { id: string } 
             {!mine && (
               <div className="mt-5">
                 <LamarButton campaignId={params.id} mine={mine} sudah={!!milikku} />
-                {milikku?.status === "accepted" && (
-                  <a href="/kerjaanku" className="mt-3 inline-flex min-h-[44px] items-center font-medium underline underline-offset-4">
-                    Kirim klip di Kerjaanku
-                  </a>
-                )}
               </div>
             )}
             {c.source_url && (
@@ -136,18 +139,18 @@ export default async function KampanyePage({ params }: { params: { id: string } 
           <div className={`${kartu} p-5 sm:p-7`}>
             <h2 className="font-mono text-xs uppercase text-stone-700">Budget</h2>
             <p className="mt-3 text-2xl font-light tabular-nums">
-              {rupiah(c.budget_remaining as number)}
-              <span className="text-sm text-stone-700"> dari {rupiah(c.budget_total as number)}</span>
+              {rupiah((c.budget_total as number) - (c.budget_remaining as number))}
+              <span className="text-sm text-stone-700"> terpakai dari {rupiah(c.budget_total as number)}</span>
             </p>
             <div
               role="meter"
-              aria-label="Sisa budget"
+              aria-label="Budget terpakai"
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-valuenow={sisa}
+              aria-valuenow={terpakai}
               className="mt-3 h-1.5 overflow-hidden rounded-full bg-stone-200"
             >
-              <div className="h-full bg-cl-rust" style={{ width: `${sisa}%` }} />
+              <div className="h-full bg-cl-rust" style={{ width: `${terpakai}%` }} />
             </div>
             {c.deadline_at && (
               <p className="mt-4 text-sm text-stone-700">Berakhir {tanggal(c.deadline_at as string)}</p>
@@ -176,22 +179,54 @@ export default async function KampanyePage({ params }: { params: { id: string } 
                     </p>
                   )}
                 </div>
-                {klipku.length > 0 && (
-                  <ul className="mt-3 divide-y divide-stone-200 text-sm">
-                    {klipku.map((k) => (
-                      <li key={k.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                        <span>Klip kamu</span>
-                        <span className="flex items-center gap-3">
-                          {k.posted_url && (
-                            <a href={k.posted_url} target="_blank" rel="noreferrer" className="underline underline-offset-4">
-                              Lihat tayangan
-                            </a>
-                          )}
-                          <Chip nada="aktif">{LABEL_KLIP[k.status] ?? k.status}</Chip>
+                {klipku.flatMap((k) => (k.posted_links ?? []).map((t) => ({ k, t }))).map(({ k, t }) => {
+                  const v = videoKlipku.find((x) => x.submission_id === k.id && x.platform === t.platform);
+                  return (
+                    <details key={`${k.id}-${t.platform}`} className="group mt-3 rounded-[14px] bg-cl-slate">
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 [&::-webkit-details-marker]:hidden">
+                        <span className="min-w-0">
+                          <span className="block font-mono text-[11px] uppercase text-cl-rust">
+                            {NAMA_PLATFORM[t.platform] ?? t.platform} · {v?.diunggah ? tanggal(v.diunggah) : "tanggal belum terbaca"}
+                          </span>
+                          <span className="block truncate font-medium">{v?.judul || "Judul belum terbaca"}</span>
                         </span>
-                      </li>
-                    ))}
-                  </ul>
+                        <span className="flex shrink-0 items-center gap-3 text-sm tabular-nums">
+                          {v ? `${angka(v.views)} views` : "–"}
+                          <Chip nada={k.status === "rejected" ? "bahaya" : "aktif"}>{LABEL_KLIP[k.status] ?? k.status}</Chip>
+                          <span aria-hidden="true" className="text-xl font-light transition-transform group-open:rotate-45">+</span>
+                        </span>
+                      </summary>
+                      <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 px-5 pb-5">
+                        <dl className="flex flex-wrap gap-x-8 gap-y-3">
+                          <Metrik k="Views" v={v?.views ?? null} />
+                          <Metrik k="Like" v={v?.likes ?? null} />
+                          <Metrik k="Komentar" v={v?.comments ?? null} />
+                          <Metrik k="Share" v={null} />
+                        </dl>
+                        <a href={t.url} target="_blank" rel="noreferrer" className="inline-flex min-h-[44px] items-center text-sm underline underline-offset-4">
+                          Buka postingan
+                        </a>
+                      </div>
+                      {(k.status === "submitted" || k.status === "draft") && (
+                        <div className="border-t border-cl-ink/10 px-5 py-5">
+                          {k.status === "draft" && k.review_note && (
+                            <p className="mb-3 text-sm text-[#4a3600]">Alasan dari kreator: {k.review_note}</p>
+                          )}
+                          <p className="font-medium">Ubah tautan</p>
+                          <KirimHasil applicationId={milikku.id} submissionId={k.id} />
+                          <div className="mt-4">
+                            <HapusKlip subId={k.id} />
+                          </div>
+                        </div>
+                      )}
+                    </details>
+                  );
+                })}
+                {milikku.status === "accepted" && (
+                  <div className="mt-4 border-t border-stone-200 pt-4">
+                    <p className="font-medium">Kirim klip</p>
+                    <KirimHasil applicationId={milikku.id} />
+                  </div>
                 )}
               </div>
             )}
@@ -218,7 +253,7 @@ export default async function KampanyePage({ params }: { params: { id: string } 
                 <>
                   <dl className={`${kartu} mt-4 grid divide-y divide-stone-200 sm:grid-cols-4 sm:divide-x sm:divide-y-0`}>
                     <Sel k="Klip masuk" v={angka(stat.clips)} />
-                    <Sel k="Klip tayang" v={angka(stat.posted)} />
+                    <Sel k="Klip disetujui" v={angka(stat.posted)} />
                     <Sel k="Total views" v={angka(stat.total_views)} />
                     <Sel k="Sudah dibayar" v={rupiah(stat.total_paid)} />
                   </dl>
@@ -275,23 +310,25 @@ export default async function KampanyePage({ params }: { params: { id: string } 
                           {LABEL_KLIP[s.status] ?? s.status}
                         </Chip>
                       </div>
-                      <LihatKlip subId={s.id} />
                       {s.status === "submitted" && (
                         <div className="mt-3">
                           <ReviewButtons subId={s.id} />
                         </div>
                       )}
-                      {s.status === "approved" && <TandaiPosted subId={s.id} />}
-                      {s.status === "approved" && <TerbitButton subId={s.id} />}
-                      {s.posted_url && (
-                        <a
-                          href={s.posted_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="mt-3 inline-flex min-h-[44px] items-center text-sm underline underline-offset-4"
-                        >
-                          Lihat tayangan
-                        </a>
+                      {(s.posted_links ?? []).length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-x-4">
+                          {(s.posted_links ?? []).map((t) => (
+                            <a
+                              key={t.url}
+                              href={t.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex min-h-[44px] items-center text-sm underline underline-offset-4"
+                            >
+                              Lihat di {NAMA_PLATFORM[t.platform] ?? t.platform}
+                            </a>
+                          ))}
+                        </div>
                       )}
                       <SengketaBox subId={s.id} flagged={!!s.flagged} mine={mine} />
                     </li>
@@ -303,6 +340,15 @@ export default async function KampanyePage({ params }: { params: { id: string } 
         )}
       </Isi>
     </>
+  );
+}
+
+function Metrik({ k, v }: { k: string; v: number | null }) {
+  return (
+    <div>
+      <dt className="text-[11px] text-[#4a3600]">{k}</dt>
+      <dd className="mt-1 text-lg font-light tabular-nums">{v === null ? "–" : angka(v)}</dd>
+    </div>
   );
 }
 

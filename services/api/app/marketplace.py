@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from . import supabase_client as supa
 from .authz import require_role, require_user
-from .schemas import CampaignCreate, Decision, Posted, Review, SubmissionCreate
+from .schemas import CampaignCreate, Decision, LinksUpdate, Review, SubmissionCreate
 
 router = APIRouter()
 
@@ -143,6 +143,23 @@ def decide(aid: str, body: Decision, authorization: str | None = Header(default=
     return {"ok": True, "status": patch["status"]}
 
 
+def _cek_tautan(client, raw: list, kecuali_sid: str | None = None) -> list[dict]:
+    """Satu klip = satu set tautan, satu tautan per platform. Tautan tidak boleh dipakai dua kali."""
+    links = [{"platform": l.platform, "url": l.url.strip()} for l in raw]
+    if any(not l["url"].startswith(("https://", "http://")) for l in links):
+        raise HTTPException(status_code=400, detail="tautan-tidak-valid")
+    if len({l["platform"] for l in links}) != len(links):
+        raise HTTPException(status_code=400, detail="platform-ganda")
+    if len({l["url"] for l in links}) != len(links):
+        raise HTTPException(status_code=400, detail="tautan-sudah-dipakai")
+    # ponytail: cek tautan dengan memindai semua submission, ganti index jsonb kalau sudah ribuan.
+    semua = client.table("submissions").select("id,posted_links").execute().data or []
+    pakai = {x["url"] for row in semua if row["id"] != kecuali_sid for x in row.get("posted_links") or []}
+    if pakai & {l["url"] for l in links}:
+        raise HTTPException(status_code=409, detail="tautan-sudah-dipakai")
+    return links
+
+
 @router.post("/submissions")
 def submit(body: SubmissionCreate, authorization: str | None = Header(default=None)):
     user_id = require_user(authorization)
@@ -159,14 +176,25 @@ def submit(body: SubmissionCreate, authorization: str | None = Header(default=No
         raise HTTPException(status_code=404, detail="tidak-ditemukan")
     if a["status"] != "accepted":
         raise HTTPException(status_code=400, detail="lamaran-belum-diterima")
-    saved = (
-        client.table("submissions")
-        .insert(
-            {"application_id": body.applicationId, "file_r2_key": body.fileR2Key, "status": "submitted"}
+    links = _cek_tautan(client, body.links)
+    try:
+        saved = (
+            client.table("submissions")
+            .insert(
+                {
+                    "application_id": body.applicationId,
+                    "status": "submitted",
+                    "posted_url": links[0]["url"],
+                    "posted_platform": links[0]["platform"],
+                    "posted_links": links,
+                    "posted_at": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+            .execute()
+            .data
         )
-        .execute()
-        .data
-    )
+    except Exception:
+        raise HTTPException(status_code=409, detail="sudah-kirim")
     if not saved:
         raise HTTPException(status_code=500, detail="gagal-kirim")
     return saved[0]
@@ -185,9 +213,61 @@ def review(sid: str, body: Review, authorization: str | None = Header(default=No
         raise HTTPException(status_code=403, detail="bukan-kampanyemu")
     if s["status"] != "submitted":
         raise HTTPException(status_code=400, detail="bukan-status-submitted")
-    status = "approved" if body.approve else "rejected"
-    client.table("submissions").update({"status": status}).eq("id", sid).execute()
+    note = body.note.strip()
+    if body.decision != "approve" and not note:
+        raise HTTPException(status_code=400, detail="alasan-wajib")
+    # Setujui: tautan sudah berisi postingan, jadi langsung mulai dilacak. Revisi: klipper kirim ulang.
+    status, note = {
+        "approve": ("posted", ""),
+        "revision": ("draft", note),
+        "decline": ("rejected", note),
+    }[body.decision]
+    client.table("submissions").update({"status": status, "review_note": note}).eq("id", sid).execute()
     return {"ok": True, "status": status}
+
+
+@router.delete("/submissions/{sid}")
+def delete_submission(sid: str, authorization: str | None = Header(default=None)):
+    """Klipper menghapus klip yang belum disetujui. Klip yang sudah diputuskan tidak bisa dihapus."""
+    user_id = require_user(authorization)
+    client = supa.service_client()
+    s = client.table("submissions").select("*").eq("id", sid).single().execute().data
+    if not s:
+        raise HTTPException(status_code=404, detail="tidak-ditemukan")
+    a = client.table("applications").select("*").eq("id", s["application_id"]).single().execute().data
+    if not a or a["editor_id"] != user_id:
+        raise HTTPException(status_code=403, detail="bukan-pihakmu")
+    if s["status"] not in ("draft", "submitted"):
+        raise HTTPException(status_code=400, detail="sudah-diputuskan")
+    client.table("submissions").delete().eq("id", sid).execute()
+    return {"ok": True}
+
+
+@router.post("/submissions/{sid}/links")
+def resubmit(sid: str, body: LinksUpdate, authorization: str | None = Header(default=None)):
+    """Klipper mengubah tautan klip yang belum diputuskan, atau mengirim ulang setelah diminta revisi."""
+    user_id = require_user(authorization)
+    client = supa.service_client()
+    s = client.table("submissions").select("*").eq("id", sid).single().execute().data
+    if not s:
+        raise HTTPException(status_code=404, detail="tidak-ditemukan")
+    a = client.table("applications").select("*").eq("id", s["application_id"]).single().execute().data
+    if not a or a["editor_id"] != user_id:
+        raise HTTPException(status_code=403, detail="bukan-pihakmu")
+    if s["status"] not in ("draft", "submitted"):
+        raise HTTPException(status_code=400, detail="sudah-diputuskan")
+    links = _cek_tautan(client, body.links, kecuali_sid=sid)
+    client.table("submissions").update(
+        {
+            "status": "submitted",
+            "review_note": "",
+            "posted_url": links[0]["url"],
+            "posted_platform": links[0]["platform"],
+            "posted_links": links,
+            "posted_at": datetime.now(timezone.utc).isoformat(),
+        }
+    ).eq("id", sid).execute()
+    return {"ok": True, "status": "submitted"}
 
 
 @router.get("/submissions/{sid}/file")
@@ -206,30 +286,6 @@ def submission_file(sid: str, authorization: str | None = Header(default=None)):
     if not s.get("file_r2_key"):
         raise HTTPException(status_code=404, detail="tidak-ditemukan")
     return {"url": r2mod.presigned_get(s["file_r2_key"], 600)}
-
-
-@router.post("/submissions/{sid}/posted")
-def mark_posted(sid: str, body: Posted, authorization: str | None = Header(default=None)):
-    user_id = require_user(authorization)
-    client = supa.service_client()
-    s = client.table("submissions").select("*").eq("id", sid).single().execute().data
-    if not s:
-        raise HTTPException(status_code=404, detail="tidak-ditemukan")
-    a = client.table("applications").select("*").eq("id", s["application_id"]).single().execute().data
-    c = campaign_or_404(client, a["campaign_id"])
-    if user_id not in (a["editor_id"], c["creator_id"]):
-        raise HTTPException(status_code=403, detail="bukan-pihakmu")
-    if s["status"] != "approved":
-        raise HTTPException(status_code=400, detail="belum-disetujui")
-    client.table("submissions").update(
-        {
-            "status": "posted",
-            "posted_url": body.url,
-            "posted_platform": body.platform,
-            "posted_at": datetime.now(timezone.utc).isoformat(),
-        }
-    ).eq("id", sid).execute()
-    return {"ok": True, "status": "posted"}
 
 
 @router.get("/campaigns/{cid}/submissions")
@@ -272,7 +328,7 @@ class Resolve(BaseModel):
 def fund(cid: str, body: Fund, authorization: str | None = Header(default=None)):
     import uuid
 
-    from . import xendit as xenditmod
+    from . import midtrans as midtransmod
     from .credits import settings_map
 
     user_id = require_user(authorization)
@@ -289,6 +345,7 @@ def fund(cid: str, body: Fund, authorization: str | None = Header(default=None))
     fee = body.amount * int(s.get("campaign_fee_pct", 15)) // 100
     total = body.amount + fee
     idem = str(uuid.uuid4())
+    order_id = f"{midtransmod.ORDER_PREFIX}fund-{idem}"
     saved = (
         client.table("topup_intents")
         .insert(
@@ -299,6 +356,7 @@ def fund(cid: str, body: Fund, authorization: str | None = Header(default=None))
                 "fee": fee,
                 "credits": 0,
                 "idempotency_key": idem,
+                "gateway_ref": order_id,
             }
         )
         .execute()
@@ -307,13 +365,10 @@ def fund(cid: str, body: Fund, authorization: str | None = Header(default=None))
     if not saved:
         raise HTTPException(status_code=500, detail="gagal-buat-fund")
     try:
-        inv = xenditmod.create_invoice(total, f"fund:{idem}")
+        tx = midtransmod.create_transaction(order_id, total, f"Danai kampanye {c['title'][:30]}")
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e)[:100])
-    client.table("topup_intents").update({"xendit_id": inv["id"]}).eq(
-        "idempotency_key", idem
-    ).execute()
-    return {"payUrl": inv["url"], "fee": fee, "total": total}
+    return {"snapToken": tx["token"], "payUrl": tx["redirect_url"], "fee": fee, "total": total}
 
 
 @router.post("/submissions/{sid}/dispute")
@@ -356,7 +411,7 @@ def payout(sid: str, authorization: str | None = Header(default=None)):
 
     from . import xendit as xenditmod
     from .credits import settings_map
-    from .payouts import compute_payout, ledger_pair
+    from .payouts import compute_payout, ledger_pair, total_per_date
 
     user_id = require_user(authorization)
     client = supa.service_client()
@@ -382,13 +437,14 @@ def payout(sid: str, authorization: str | None = Header(default=None)):
         raise HTTPException(status_code=400, detail="masa-tahan-belum-lewat")
     snaps = (
         client.table("view_snapshots")
-        .select("views")
+        .select("views,snapshot_date")
         .eq("submission_id", sid)
         .execute()
         .data
         or []
     )
-    final_views = max([x["views"] for x in snaps]) if snaps else 0
+    series = total_per_date(snaps)
+    final_views = max(series) if series else 0
     amount = compute_payout(
         s.get("views_final") or final_views,
         c["rate_per_1000_views"],

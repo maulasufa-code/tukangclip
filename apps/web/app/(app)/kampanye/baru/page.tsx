@@ -14,7 +14,7 @@ export default async function KampanyeBaruPage() {
         id="judul-baru"
         penanda="Kreator"
         judul="Kampanye baru"
-        deskripsi="Tulis brief, tentukan rate per 1.000 views, dan batasi bayaran per klip. Budget dicatat sebagai escrow terkunci; gerak uang nyata via Xendit belum aktif."
+        deskripsi="Tulis brief, tentukan rate per 1.000 views, dan batasi bayaran per klip. Budget dibayar lewat Midtrans dan masuk escrow yang terkunci. Pencairan ke clipper belum aktif."
       />
       <Isi className="max-w-3xl">
         <KampanyeForm />

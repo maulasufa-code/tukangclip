@@ -3,7 +3,7 @@ import { rupiah } from "@/lib/harga";
 
 // Kartu satu kampanye terbuka: rate per 1.000 views paling menonjol, karena itu yang dicari clipper.
 export function KartuKampanye({ k }: { k: KampanyePublik }) {
-  const sisa = k.budget_total > 0 ? Math.round((k.budget_remaining / k.budget_total) * 100) : 0;
+  const terpakai = k.budget_total > 0 ? Math.round(((k.budget_total - k.budget_remaining) / k.budget_total) * 100) : 0;
   return (
     <article className="flex h-full flex-col rounded-lg border border-stone-200 bg-white p-4 text-cl-ink">
       <h3 className="text-[17px] font-medium leading-snug">{k.title}</h3>
@@ -14,21 +14,18 @@ export function KartuKampanye({ k }: { k: KampanyePublik }) {
       </p>
       <p className="mt-1 text-sm text-stone-700">Maks {rupiah(k.cap_per_clip)} per klip</p>
       <div className="mt-4">
-        <div className="flex justify-between text-sm">
-          <span>Sisa budget</span>
-          <span className="tabular-nums">
-            {rupiah(k.budget_remaining)} dari {rupiah(k.budget_total)}
-          </span>
-        </div>
+        <p className="text-sm tabular-nums">
+          {rupiah(k.budget_total - k.budget_remaining)} terpakai dari {rupiah(k.budget_total)}
+        </p>
         <div
           role="meter"
-          aria-label="Sisa budget"
+          aria-label="Budget terpakai"
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-valuenow={sisa}
+          aria-valuenow={terpakai}
           className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-stone-200"
         >
-          <div className="h-full bg-cl-rust" style={{ width: `${sisa}%` }} />
+          <div className="h-full bg-cl-rust" style={{ width: `${terpakai}%` }} />
         </div>
       </div>
       {k.deadline_at && (

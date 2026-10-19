@@ -6,6 +6,14 @@ def compute_payout(views_final: int, rate_per_1000: int, cap_per_clip: int, budg
     return min(gross, cap_per_clip, budget_remaining)
 
 
+def total_per_date(snaps: list[dict]) -> list[int]:
+    """Total views semua platform per tanggal, diurutkan menurut tanggal."""
+    per: dict[str, int] = {}
+    for x in snaps:
+        per[x["snapshot_date"]] = per.get(x["snapshot_date"], 0) + x["views"]
+    return [per[d] for d in sorted(per)]
+
+
 def detect_spike(daily_views: list[int], multiplier: int = 10, min_views: int = 1000) -> bool:
     if len(daily_views) < 4:
         return False

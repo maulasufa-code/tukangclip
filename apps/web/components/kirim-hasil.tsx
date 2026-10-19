@@ -3,73 +3,134 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { isian, tombolPrimer, tombolSekunder } from "@/components/ui";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "";
-const MAX_BYTES = 2 * 1024 * 1024 * 1024;
+const PLATFORM = [
+  { nilai: "youtube", label: "YouTube" },
+  { nilai: "tiktok", label: "TikTok" },
+  { nilai: "instagram", label: "Instagram" }
+];
+const MAKS_TAUTAN = PLATFORM.length;
 
-export function KirimHasil({ applicationId }: { applicationId: string }) {
+const PESAN: Record<string, string> = {
+  "tautan-sudah-dipakai": "Salah satu tautan ini sudah pernah dikirim. Satu tautan hanya bisa dipakai sekali.",
+  "tautan-tidak-valid": "Tautan harus diawali https://.",
+  "platform-ganda": "Tiap platform hanya boleh satu tautan.",
+  "lamaran-belum-diterima": "Lamaranmu belum diterima."
+};
+
+type Baris = { platform: string; url: string };
+
+const BARIS_AWAL: Baris[] = [{ platform: "youtube", url: "" }];
+
+export function KirimHasil({ applicationId, submissionId }: { applicationId: string; submissionId?: string }) {
   const router = useRouter();
+  const [baris, setBaris] = useState<Baris[]>(BARIS_AWAL);
   const [fase, setFase] = useState<"idle" | "kerja" | "gagal" | "ok">("idle");
   const [pesan, setPesan] = useState("");
 
-  async function kirim(file: File) {
+  const dipakai = (nilai: string, kecuali: number) => baris.some((b, j) => j !== kecuali && b.platform === nilai);
+  const platformSisa = PLATFORM.find((p) => !baris.some((b) => b.platform === p.nilai));
+
+  function ubah(i: number, patch: Partial<Baris>) {
+    setBaris((daftar) => daftar.map((b, j) => (j === i ? { ...b, ...patch } : b)));
+  }
+
+  function tambah() {
+    if (platformSisa) setBaris((daftar) => [...daftar, { platform: platformSisa.nilai, url: "" }]);
+  }
+
+  function hapus(i: number) {
+    setBaris((daftar) => daftar.filter((_, j) => j !== i));
+  }
+
+  async function kirim(e: React.FormEvent) {
+    e.preventDefault();
     if (!API) {
       setFase("gagal");
       setPesan("API backend belum dikonfigurasi.");
       return;
     }
-    if (file.size > MAX_BYTES || file.type !== "video/mp4") {
-      setFase("gagal");
-      setPesan("Hanya MP4 sampai 2 GB.");
-      return;
-    }
     setFase("kerja");
     try {
-      const supabase = supabaseBrowser();
-      const { data } = await supabase.auth.getSession();
-      const auth = `Bearer ${data.session?.access_token ?? ""}`;
-      const pre = await fetch(`${API}/r2/presign`, {
+      const { data } = await supabaseBrowser().auth.getSession();
+      const res = await fetch(submissionId ? `${API}/submissions/${submissionId}/links` : `${API}/submissions`, {
         method: "POST",
-        headers: { "content-type": "application/json", authorization: auth },
-        body: JSON.stringify({ filename: file.name, bytes: file.size, mime: file.type, kind: "submission" })
+        headers: { "content-type": "application/json", authorization: `Bearer ${data.session?.access_token ?? ""}` },
+        body: JSON.stringify({
+          applicationId,
+          links: baris.map((b) => ({ platform: b.platform, url: b.url.trim() }))
+        })
       });
-      if (!pre.ok) throw new Error("presign gagal");
-      const { uploadUrl, r2Key } = await pre.json();
-      const put = await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
-      if (!put.ok) throw new Error("unggah gagal");
-      const sub = await fetch(`${API}/submissions`, {
-        method: "POST",
-        headers: { "content-type": "application/json", authorization: auth },
-        body: JSON.stringify({ applicationId, fileR2Key: r2Key })
-      });
-      if (!sub.ok) throw new Error(`kirim ditolak (${sub.status})`);
+      if (!res.ok) {
+        const { detail } = (await res.json().catch(() => ({}))) as { detail?: string };
+        throw new Error(PESAN[detail ?? ""] ?? `Gagal mengirim (${res.status}). Coba lagi.`);
+      }
       setFase("ok");
+      setBaris(BARIS_AWAL);
       router.refresh();
-    } catch (e) {
+    } catch (err) {
       setFase("gagal");
-      setPesan(e instanceof Error ? e.message : "Gagal.");
+      setPesan(err instanceof Error ? err.message : "Gagal mengirim.");
     }
   }
 
   return (
-    <div className="mt-4">
-      <label className="flex min-h-[88px] cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-cl-ink bg-cl-slate p-4 text-center text-sm focus-within:outline focus-within:outline-[3px] focus-within:outline-offset-2 focus-within:outline-[#8a3a00]">
-        <span className="font-medium">{fase === "kerja" ? "Mengunggah dan mengirim..." : "Pilih file klip (MP4)"}</span>
-        <span className="text-cl-ink">Maksimal 2 GB. Kreator akan meninjau klipmu.</span>
-        <input
-          type="file"
-          accept="video/mp4"
-          disabled={fase === "kerja"}
-          className="sr-only"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) void kirim(f);
-            e.target.value = "";
-          }}
-        />
-      </label>
-      {fase === "ok" && <p role="status" className="mt-2 text-sm font-medium">Terkirim untuk direview.</p>}
-      {fase === "gagal" && <p role="alert" className="mt-2 text-sm text-red-900">{pesan}</p>}
-    </div>
+    <form onSubmit={kirim} className="mt-4 space-y-3">
+      <p className="text-sm text-stone-700">
+        Sudah posting klipmu? Kirim tautannya. Satu klip boleh tayang di beberapa platform dan akun, satu tautan per platform. Klip yang sama tidak boleh diunggah ulang.
+      </p>
+      {baris.map((b, i) => (
+        <div key={i} className="flex flex-wrap gap-2">
+          <select
+            aria-label={`Platform tautan ${i + 1}`}
+            value={b.platform}
+            onChange={(e) => ubah(i, { platform: e.target.value })}
+            className="min-h-[44px] rounded-[7px] border-2 border-stone-300 bg-white px-3"
+          >
+            {PLATFORM.map((p) => (
+              <option key={p.nilai} value={p.nilai} disabled={dipakai(p.nilai, i)}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+          <input
+            required
+            type="url"
+            aria-label={`Tautan postingan ${i + 1}`}
+            placeholder="https://..."
+            value={b.url}
+            onChange={(e) => ubah(i, { url: e.target.value })}
+            className={`${isian} !mt-0 min-w-0 flex-1`}
+          />
+          {baris.length > 1 && (
+            <button type="button" onClick={() => hapus(i)} className={tombolSekunder}>
+              Hapus
+            </button>
+          )}
+        </div>
+      ))}
+      <div className="flex flex-wrap gap-2">
+        {baris.length < MAKS_TAUTAN && platformSisa && (
+          <button type="button" onClick={tambah} className={tombolSekunder}>
+            Tambah platform
+          </button>
+        )}
+        <button disabled={fase === "kerja"} className={tombolPrimer}>
+          {fase === "kerja" ? "Mengirim..." : "Kirim tautan"}
+        </button>
+      </div>
+      {fase === "ok" && (
+        <p role="status" className="text-sm font-medium">
+          Terkirim. Kreator akan meninjau postinganmu.
+        </p>
+      )}
+      {fase === "gagal" && (
+        <p role="alert" className="text-sm text-red-900">
+          {pesan}
+        </p>
+      )}
+    </form>
   );
 }

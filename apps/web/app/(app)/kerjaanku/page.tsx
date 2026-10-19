@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { ambilPengguna } from "@/lib/sesi";
 import { rupiah } from "@/lib/harga";
-import { KirimHasil } from "@/components/kirim-hasil";
 import { Chip, Isi, KepalaHalaman, Kosong, kartu, sisaWaktu, tanggal, tombolPrimer } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +13,9 @@ type Lamaran = {
   campaign: { id: string; title: string; rate_per_1000_views: number } | null;
 };
 
-type Klip = { application_id: string; status: string; posted_url: string | null };
+type Klip = { application_id: string; status: string; posted_links: { platform: string; url: string }[] | null };
+
+const NAMA_PLATFORM: Record<string, string> = { youtube: "YouTube", tiktok: "TikTok", instagram: "Instagram" };
 
 const LABEL_LAMARAN: Record<string, string> = {
   applied: "Menunggu",
@@ -25,12 +26,12 @@ const LABEL_LAMARAN: Record<string, string> = {
 };
 
 const LABEL_KLIP: Record<string, string> = {
-  draft: "Draf",
-  submitted: "Menunggu review",
+  draft: "Perlu revisi",
+  submitted: "Menunggu keputusan",
   approved: "Disetujui",
   rejected: "Ditolak",
-  posted: "Tayang",
-  tracking: "Dilacak",
+  posted: "Disetujui",
+  tracking: "Disetujui",
   paid_out: "Dibayar"
 };
 
@@ -48,7 +49,7 @@ export default async function KerjaankuPage() {
   const { data: klipData } = lamaran.length
     ? await supabase
         .from("submissions")
-        .select("application_id,status,posted_url")
+        .select("application_id,status,posted_links")
         .in("application_id", lamaran.map((l) => l.id))
     : { data: [] as Klip[] };
   const klip = (klipData ?? []) as Klip[];
@@ -114,16 +115,18 @@ export default async function KerjaankuPage() {
                       <Chip nada={k.status === "rejected" ? "bahaya" : "aktif"}>
                         {LABEL_KLIP[k.status] ?? k.status}
                       </Chip>
-                      {k.posted_url && (
-                        <a href={k.posted_url} target="_blank" rel="noreferrer" className="underline underline-offset-4">
-                          Lihat tayangan
+                      {(k.posted_links ?? []).map((t) => (
+                        <a key={t.url} href={t.url} target="_blank" rel="noreferrer" className="underline underline-offset-4">
+                          {NAMA_PLATFORM[t.platform] ?? t.platform}
                         </a>
-                      )}
+                      ))}
                     </p>
                   ))}
 
-                  {l.status === "accepted" && (!miliknya.length || miliknya.every((k) => k.status === "rejected")) && (
-                    <KirimHasil applicationId={l.id} />
+                  {l.status === "accepted" && l.campaign && (
+                    <a href={`/kampanye/${l.campaign.id}`} className="mt-4 inline-flex min-h-[44px] items-center font-medium underline underline-offset-4">
+                      Kirim klip di kampanye ini
+                    </a>
                   )}
                 </li>
               );

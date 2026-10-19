@@ -145,7 +145,7 @@ terbesar, dan rate tertinggi. Melamar tetap perlu masuk sebagai clipper.
 
 Ini yang belum jalan dan karenanya tidak boleh diklaim di landing:
 
-- Gerak uang nyata lewat Xendit belum aktif (masih dicatat sebagai escrow).
+- Pembayaran lewat Midtrans masih mode sandbox. Pencairan ke clipper (payout, Xendit) belum aktif, jadi bayaran masih dicatat sebagai escrow.
 - OAuth TikTok masih menunggu verifikasi dari TikTok.
 - Analisis dan render otomatis masih dalam pengerjaan.
 - API backend Fase 2 belum tersambung di halaman tertentu.

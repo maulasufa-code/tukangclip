@@ -16,6 +16,75 @@ body {
   color: #1f1400;
 }
 
+/* Gerak halaman analytics. Setiap gerak sekali jalan saat bagiannya terlihat, tanpa loop. */
+.gerak {
+  animation-duration: 0.8s;
+  animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+  animation-fill-mode: both;
+}
+[data-lihat="0"] .gerak {
+  animation-play-state: paused;
+}
+.gerak-garis {
+  stroke-dasharray: 1;
+  animation-name: gambar;
+  animation-duration: 1.2s;
+}
+.gerak-batang {
+  transform-origin: left center;
+  animation-name: tumbuh;
+}
+.gerak-muncul {
+  animation-name: muncul;
+}
+@keyframes gambar {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes tumbuh {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes muncul {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gerak {
+    animation: none;
+  }
+  /* Grafik langsung di posisi akhir tanpa transisi. */
+  svg * {
+    transition: none !important;
+  }
+  .gerak-garis {
+    stroke-dasharray: none;
+  }
+}
+
+/* Judul besar gaya landing, dipakai di dasbor. */
+.judul-besar {
+  font-size: clamp(34px, 4.6vw, 66px);
+  font-weight: 300;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
 /* Cincin fokus default untuk halaman terang. */
 :focus-visible {
   outline: 3px solid var(--fokus, #8a3a00);

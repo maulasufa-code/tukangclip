@@ -51,7 +51,15 @@ class Q:
         self.patch = patch
         return self
 
+    def delete(self):
+        self.last_op = "delete"
+        return self
+
     def execute(self):
+        if self.last_op == "delete":
+            hapus = {r.get("id") for r in self.rows or []}
+            self.store[self.table] = [r for r in self.store.get(self.table, []) if r.get("id") not in hapus]
+            return type("R", (), {"data": self.rows or []})()
         if self.patch is not None and self.rows is not None:
             for r in self.rows:
                 r.update(self.patch)
@@ -138,21 +146,69 @@ def test_apply_accept_submit_review_posted():
 
     sub = c.post(
         "/submissions",
-        json={"applicationId": app.json()["id"], "fileR2Key": "submissions/e/f.mp4"},
+        json={
+            "applicationId": app.json()["id"],
+            "links": [
+                {"platform": "youtube", "url": "https://youtu.be/x"},
+                {"platform": "tiktok", "url": "https://tiktok.com/@a/video/1"},
+            ],
+        },
         headers=EDITOR,
     )
     assert sub.status_code == 200, sub.text
     sid = sub.json()["id"]
+    assert store["submissions"][0]["posted_url"] == "https://youtu.be/x"
+    assert len(store["submissions"][0]["posted_links"]) == 2
 
-    rev = c.post(f"/submissions/{sid}/review", json={"approve": True}, headers=CREATOR)
-    assert rev.json()["status"] == "approved"
+    rev = c.post(f"/submissions/{sid}/review", json={"decision": "approve"}, headers=CREATOR)
+    assert rev.json()["status"] == "posted"
 
-    post = c.post(
-        f"/submissions/{sid}/posted",
-        json={"url": "https://youtu.be/x", "platform": "youtube"},
+
+def test_banyak_klip_boleh_tapi_tautan_tidak_boleh_dipakai_ulang():
+    store = base_store()
+    store["campaigns"] = [{"id": "c1", "creator_id": "creator-1", "status": "open", "title": "Uji"}]
+    store["applications"] = [
+        {"id": "a1", "campaign_id": "c1", "editor_id": "editor-1", "status": "accepted"},
+        {"id": "a2", "campaign_id": "c1", "editor_id": "orang-lain", "status": "accepted"},
+    ]
+    c = client_with(store)
+    klip1 = {"applicationId": "a1", "links": [{"platform": "youtube", "url": "https://youtu.be/x"}]}
+    assert c.post("/submissions", json=klip1, headers=EDITOR).status_code == 200
+    klip2 = {"applicationId": "a1", "links": [{"platform": "youtube", "url": "https://youtu.be/y"}]}
+    assert c.post("/submissions", json=klip2, headers=EDITOR).status_code == 200
+
+    tiru = {"applicationId": "a2", "links": [{"platform": "tiktok", "url": "https://youtu.be/x"}]}
+    r = c.post("/submissions", json=tiru, headers={"authorization": "Bearer orang-lain"})
+    assert r.status_code == 409 and r.json()["detail"] == "tautan-sudah-dipakai"
+
+
+def test_total_views_dijumlah_per_tanggal_lintas_platform():
+    from app.payouts import total_per_date
+
+    snaps = [
+        {"platform": "youtube", "views": 100, "snapshot_date": "2026-10-01"},
+        {"platform": "tiktok", "views": 50, "snapshot_date": "2026-10-01"},
+        {"platform": "youtube", "views": 300, "snapshot_date": "2026-10-02"},
+    ]
+    assert total_per_date(snaps) == [150, 300]
+
+
+def test_platform_ganda_ditolak():
+    store = base_store()
+    store["applications"] = [{"id": "a1", "campaign_id": "c1", "editor_id": "editor-1", "status": "accepted"}]
+    c = client_with(store)
+    r = c.post(
+        "/submissions",
+        json={
+            "applicationId": "a1",
+            "links": [
+                {"platform": "youtube", "url": "https://youtu.be/x"},
+                {"platform": "youtube", "url": "https://youtu.be/y"},
+            ],
+        },
         headers=EDITOR,
     )
-    assert post.json()["status"] == "posted"
+    assert r.status_code == 400 and r.json()["detail"] == "platform-ganda"
 
 
 def test_review_rejects_foreign_creator():
@@ -161,7 +217,7 @@ def test_review_rejects_foreign_creator():
     store["applications"] = [{"id": "a1", "campaign_id": "c1", "editor_id": "editor-1", "status": "accepted"}]
     store["submissions"] = [{"id": "s1", "application_id": "a1", "status": "submitted"}]
     c = client_with(store)
-    r = c.post("/submissions/s1/review", json={"approve": True}, headers=OTHER)
+    r = c.post("/submissions/s1/review", json={"decision": "approve"}, headers=OTHER)
     assert r.status_code == 403
 
 
@@ -169,7 +225,11 @@ def test_submit_requires_accepted():
     store = base_store()
     store["applications"] = [{"id": "a1", "campaign_id": "c1", "editor_id": "editor-1", "status": "applied"}]
     c = client_with(store)
-    r = c.post("/submissions", json={"applicationId": "a1", "fileR2Key": "x"}, headers=EDITOR)
+    r = c.post(
+        "/submissions",
+        json={"applicationId": "a1", "links": [{"platform": "youtube", "url": "https://youtu.be/x"}]},
+        headers=EDITOR,
+    )
     assert r.status_code == 400
 
 
@@ -187,18 +247,20 @@ def test_campaign_list_is_public_and_hides_source():
 
 
 def test_fund_adds_fee_on_top_and_enforces_minimum(monkeypatch):
-    from app import xendit as xenditmod
+    from app import midtrans as midtransmod
 
     store = base_store()
     store["settings"] = [
         {"key": "campaign_fee_pct", "value": {"value": 15}},
         {"key": "min_campaign_topup_idr", "value": {"value": 3000000}},
     ]
-    store["campaigns"] = [{"id": "c1", "creator_id": "creator-1", "status": "open"}]
+    store["campaigns"] = [{"id": "c1", "creator_id": "creator-1", "status": "open", "title": "Uji"}]
     store["topup_intents"] = []
     dibayar = []
     monkeypatch.setattr(
-        xenditmod, "create_invoice", lambda a, e, p=None: dibayar.append(a) or {"id": "x1", "url": "https://pay/x1"}
+        midtransmod,
+        "create_transaction",
+        lambda oid, amt, title, email=None: dibayar.append(amt) or {"token": "t1", "redirect_url": "https://pay/x1"},
     )
     c = client_with(store)
 
@@ -221,3 +283,41 @@ def test_apply_blocked_after_three_active_projects():
         assert c.post(f"/campaigns/{cid}/apply", headers=EDITOR).status_code == 200
     r = c.post(f"/campaigns/{ids[3]}/apply", headers=EDITOR)
     assert r.status_code == 409 and r.json()["detail"] == "batas-proyek-aktif"
+
+
+def test_revisi_dan_tolak_wajib_alasan_lalu_klipper_kirim_ulang():
+    store = base_store()
+    store["campaigns"] = [{"id": "c1", "creator_id": "creator-1", "status": "open"}]
+    store["applications"] = [{"id": "a1", "campaign_id": "c1", "editor_id": "editor-1", "status": "accepted"}]
+    store["submissions"] = [{"id": "s1", "application_id": "a1", "status": "submitted", "posted_links": []}]
+    c = client_with(store)
+    tanpa_alasan = c.post("/submissions/s1/review", json={"decision": "revision"}, headers=CREATOR)
+    assert tanpa_alasan.status_code == 400 and tanpa_alasan.json()["detail"] == "alasan-wajib"
+
+    c.post("/submissions/s1/review", json={"decision": "revision", "note": "Potongan terlalu panjang"}, headers=CREATOR)
+    assert store["submissions"][0]["status"] == "draft"
+    assert store["submissions"][0]["review_note"] == "Potongan terlalu panjang"
+
+    kirim_ulang = c.post(
+        "/submissions/s1/links",
+        json={"links": [{"platform": "tiktok", "url": "https://tiktok.com/@a/video/9"}]},
+        headers=EDITOR,
+    )
+    assert kirim_ulang.status_code == 200, kirim_ulang.text
+    assert store["submissions"][0]["status"] == "submitted"
+    assert store["submissions"][0]["review_note"] == ""
+
+
+def test_klip_disetujui_tidak_bisa_dihapus_atau_diubah_klipper():
+    store = base_store()
+    store["applications"] = [{"id": "a1", "campaign_id": "c1", "editor_id": "editor-1", "status": "accepted"}]
+    store["submissions"] = [
+        {"id": "s1", "application_id": "a1", "status": "submitted", "posted_links": []},
+        {"id": "s2", "application_id": "a1", "status": "posted", "posted_links": []},
+    ]
+    c = client_with(store)
+    ok = c.delete("/submissions/s1", headers=EDITOR)
+    assert ok.status_code == 200, ok.text
+    assert [r["id"] for r in store["submissions"]] == ["s2"]
+    tolak = c.delete("/submissions/s2", headers=EDITOR)
+    assert tolak.status_code == 400 and tolak.json()["detail"] == "sudah-diputuskan"

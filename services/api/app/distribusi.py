@@ -1,12 +1,12 @@
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 from . import social as socialmod
 from . import supabase_client as supa
-from .analytics import aggregate_campaign, editor_stats
+from .analytics import aggregate_campaign, build_report, editor_stats
 from .authz import require_user
 
 router = APIRouter()
@@ -186,6 +186,80 @@ def campaign_analytics(cid: str, authorization: str | None = Header(default=None
     )
     paid = sum(x.get("credit", 0) for x in legs if str(x.get("account", "")).startswith("payable:"))
     return aggregate_campaign(subs, snaps, paid)
+
+
+@router.get("/analytics")
+def analytics(
+    from_: str | None = Query(default=None, alias="from"),
+    to: str | None = None,
+    campaign_id: str | None = None,
+    authorization: str | None = Header(default=None),
+):
+    """Analytics semua video milik user: kreator melihat kampanyenya, clipper melihat kerjanya.
+
+    Rentang tanggal lewat `from` dan `to` (YYYY-MM-DD, batas inklusif). Default 30 hari terakhir.
+    """
+    user_id = require_user(authorization)
+    client = supa.service_client()
+    try:
+        akhir = date.fromisoformat(to) if to else date.today()
+        awal = date.fromisoformat(from_) if from_ else akhir - timedelta(days=29)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="tanggal-tidak-valid")
+    if awal > akhir:
+        raise HTTPException(status_code=400, detail="rentang-terbalik")
+    if (akhir - awal).days > 364:
+        raise HTTPException(status_code=400, detail="rentang-terlalu-lebar")
+
+    campaigns = client.table("campaigns").select("*").eq("creator_id", user_id).execute().data or []
+    peran = "creator"
+    if campaigns:
+        apps = []
+        for c in campaigns:
+            apps.extend(client.table("applications").select("*").eq("campaign_id", c["id"]).execute().data or [])
+    else:
+        peran = "editor"
+        apps = client.table("applications").select("*").eq("editor_id", user_id).execute().data or []
+        for cid in dict.fromkeys(a["campaign_id"] for a in apps):
+            campaigns.extend(client.table("campaigns").select("*").eq("id", cid).execute().data or [])
+
+    pilihan = [{"id": c["id"], "title": c.get("title", "")} for c in campaigns]
+    if campaign_id:
+        campaigns = [c for c in campaigns if c["id"] == campaign_id]
+        apps = [a for a in apps if a["campaign_id"] == campaign_id]
+
+    subs = []
+    for a in apps:
+        subs.extend(client.table("submissions").select("*").eq("application_id", a["id"]).execute().data or [])
+    snaps = []
+    for s in subs:
+        snaps.extend(client.table("view_snapshots").select("*").eq("submission_id", s["id"]).execute().data or [])
+    # ponytail: satu query per lamaran dan per klip, ganti ke satu query .in_() kalau datanya ratusan.
+    return {
+        **build_report(campaigns, apps, subs, snaps, awal, akhir),
+        "peran": peran,
+        "pilihan_kampanye": pilihan,
+    }
+
+
+@router.get("/leaderboard")
+def leaderboard(authorization: str | None = Header(default=None)):
+    """Papan peringkat clipper berdasarkan views klip tayang. Nama yang tampil adalah display_name."""
+    from .analytics import papan_peringkat
+
+    user_id = require_user(authorization)
+    client = supa.service_client()
+    apps = client.table("applications").select("id,editor_id").execute().data or []
+    subs = client.table("submissions").select("id,application_id,status").execute().data or []
+    snaps = client.table("view_snapshots").select("submission_id,platform,views").execute().data or []
+    editor_ids = {a["editor_id"] for a in apps}
+    nama = {}
+    if editor_ids:
+        for p in client.table("profiles").select("id,display_name").execute().data or []:
+            if p["id"] in editor_ids:
+                nama[p["id"]] = p.get("display_name") or ""
+    # ponytail: memindai semua baris di sini. Kalau clipper sudah ribuan, hitung di SQL (view agregat).
+    return papan_peringkat(apps, subs, snaps, nama, saya=user_id)
 
 
 @router.get("/me/stats")

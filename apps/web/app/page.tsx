@@ -35,7 +35,7 @@ const tanya = [
   },
   {
     q: "Kapan clipper dibayar?",
-    a: "Setelah klip kamu setujui dan tayang. Bayaran dihitung dari views akun resmi: views dibagi 1.000 dikali rate, tidak lebih dari batas per klip dan sisa budget. Gerak uang nyata lewat Xendit belum aktif, jadi saat ini dana masih dicatat sebagai escrow."
+    a: "Setelah klip kamu setujui dan tayang. Bayaran dihitung dari views akun resmi: views dibagi 1.000 dikali rate, tidak lebih dari batas per klip dan sisa budget. Dana budget masuk escrow lewat Midtrans. Pencairan ke clipper belum aktif, jadi saat ini bayaran masih tercatat di escrow."
   },
   {
     q: "Bagaimana kalau ada views palsu?",
@@ -54,7 +54,7 @@ const tanya = [
 const statusRilis = [
   { label: "Sudah jalan", isi: "Daftar akun, verifikasi email, unggah langsung ke penyimpanan, dan antrean job di dasbor." },
   { label: "Menyusul", isi: "Analisis dan render otomatis, plus API backend untuk kampanye, kredit, dan studio di semua halaman." },
-  { label: "Menyusul", isi: "Gerak uang nyata lewat Xendit, dan penyambungan akun TikTok yang menunggu verifikasi." }
+  { label: "Menyusul", isi: "Pencairan bayaran ke clipper, dan penyambungan akun TikTok yang menunggu verifikasi." }
 ];
 
 // Kelas tombol disatukan supaya primer dan sekunder sama di terang maupun gelap.
@@ -161,7 +161,7 @@ export default async function Beranda() {
                   </Ilustrasi>
                 </Blok>
 
-                <Blok nomor={1} judul="Danai budgetnya lewat Xendit." isi={`Seluruh budget masuk escrow kampanye untuk clipper. Biaya platform ${BIAYA_PLATFORM_PERSEN}% dibayar terpisah di atasnya.`}>
+                <Blok nomor={1} judul="Danai budgetnya lewat Midtrans." isi={`Seluruh budget masuk escrow kampanye untuk clipper. Biaya platform ${BIAYA_PLATFORM_PERSEN}% dibayar terpisah di atasnya.`}>
                   <Ilustrasi>
                     <Kartu judul="Contoh pendanaan">
                       <Spek n="Budget untuk clipper" v={rupiah(contohTopup.budget)} utama />

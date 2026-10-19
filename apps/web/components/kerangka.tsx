@@ -9,12 +9,14 @@ const TAUTAN_BERSAMA: Butir[] = [
 const TAUTAN: Record<Peran | "tamu", Butir[]> = {
   editor: [
     { href: "/dasbor", label: "Dasbor" },
+    { href: "/analytics", label: "Analytics" },
     { href: "/pasar", label: "Cari kampanye" },
     { href: "/kerjaanku", label: "Kerjaanku" },
     ...TAUTAN_BERSAMA
   ],
   creator: [
     { href: "/dasbor", label: "Dasbor" },
+    { href: "/analytics", label: "Analytics" },
     { href: "/kampanye/baru", label: "Kampanye baru" },
     { href: "/unggah", label: "Unggah" },
     { href: "/kredit", label: "Kredit AI" },
@@ -22,6 +24,7 @@ const TAUTAN: Record<Peran | "tamu", Butir[]> = {
   ],
   admin: [
     { href: "/dasbor", label: "Dasbor" },
+    { href: "/analytics", label: "Analytics" },
     { href: "/kampanye/baru", label: "Kampanye baru" },
     { href: "/pasar", label: "Pasar" },
     { href: "/unggah", label: "Unggah" },

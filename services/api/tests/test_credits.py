@@ -8,6 +8,8 @@ from fastapi.testclient import TestClient
 from app import main as api
 from app import credits as creditsmod
 
+SERVER_KEY = "test-server-key"
+
 
 class Q:
     def __init__(self, store, table):
@@ -140,49 +142,86 @@ def test_job_spends_one_credit():
     assert sum(x["amount"] for x in store["ai_credit_ledger"]) == 4
 
 
-def test_topup_returns_pay_url(monkeypatch):
+def midtrans_notif(order_id: str, gross: str, status: str = "settlement", fraud: str = "accept") -> dict:
+    import hashlib
+
+    sig = hashlib.sha512(f"{order_id}200{gross}{SERVER_KEY}".encode()).hexdigest()
+    return {
+        "order_id": order_id,
+        "status_code": "200",
+        "gross_amount": gross,
+        "signature_key": sig,
+        "transaction_status": status,
+        "fraud_status": fraud,
+    }
+
+
+def test_topup_returns_snap_token(monkeypatch):
+    monkeypatch.setenv("MIDTRANS_SERVER_KEY", SERVER_KEY)
     store = {**settings_store(), "topup_intents": []}
     monkeypatch.setattr(
-        api.xenditmod, "create_invoice", lambda a, e, p=None: {"id": "xin-1", "url": "https://pay/xin-1"}
+        api.midtransmod,
+        "create_transaction",
+        lambda oid, amt, title, email=None: {"token": "snap-1", "redirect_url": "https://pay/1"},
     )
     c = client_with(store)
     r = c.post("/topups", json={"amount": 50000}, headers={"authorization": "Bearer x"})
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["fee"] == 5000 and body["credits"] == 9
-    assert store["topup_intents"][0]["xendit_id"] == "xin-1"
+    assert body["snapToken"] == "snap-1"
+    intent = store["topup_intents"][0]
+    assert intent["gateway_ref"] == "tc-" + intent["idempotency_key"]
 
 
-def test_webhook_credits_once(monkeypatch):
-    monkeypatch.setenv("XENDIT_CALLBACK_TOKEN", "rahasia")
+def test_webhook_credits_once_and_issues_invoice(monkeypatch):
+    monkeypatch.setenv("MIDTRANS_SERVER_KEY", SERVER_KEY)
     store = {
         **settings_store(),
         "topup_intents": [
             {
                 "id": "t1",
                 "user_id": "user-1",
+                "amount": 50000,
+                "fee": 5000,
                 "credits": 9,
                 "status": "pending",
-                "xendit_id": "xin-1",
+                "gateway_ref": "tc-idem-1",
                 "idempotency_key": "idem-1",
             }
         ],
         "ai_credit_ledger": [],
+        "invoices": [],
     }
     c = client_with(store)
-    h = {"authorization": "Bearer x", "x-callback-token": "rahasia"}
-    body = {"id": "xin-1", "status": "PAID"}
-    assert c.post("/webhooks/xendit", json=body, headers=h).status_code == 200
-    assert c.post("/webhooks/xendit", json=body, headers=h).status_code == 200
+    body = midtrans_notif("tc-idem-1", "50000.00")
+    assert c.post("/webhooks/midtrans", json=body).status_code == 200
+    assert c.post("/webhooks/midtrans", json=body).status_code == 200
     assert sum(x["amount"] for x in store["ai_credit_ledger"]) == 9
     assert store["topup_intents"][0]["status"] == "paid"
+    assert len(store["invoices"]) == 1
+    assert store["invoices"][0]["number"].startswith("INV-")
 
 
-def test_webhook_rejects_bad_token():
+def test_webhook_rejects_bad_signature(monkeypatch):
+    monkeypatch.setenv("MIDTRANS_SERVER_KEY", SERVER_KEY)
     c = client_with({})
-    r = c.post(
-        "/webhooks/xendit",
-        json={"id": "x", "status": "PAID"},
-        headers={"x-callback-token": "salah"},
-    )
+    body = midtrans_notif("idem-1", "50000.00")
+    body["gross_amount"] = "1.00"
+    r = c.post("/webhooks/midtrans", json=body)
     assert r.status_code == 401
+
+
+def test_webhook_ignores_pending(monkeypatch):
+    monkeypatch.setenv("MIDTRANS_SERVER_KEY", SERVER_KEY)
+    c = client_with({})
+    body = midtrans_notif("idem-1", "50000.00", status="pending")
+    assert c.post("/webhooks/midtrans", json=body).status_code == 200
+
+
+def test_webhook_ignores_order_from_other_platform(monkeypatch):
+    monkeypatch.setenv("MIDTRANS_SERVER_KEY", SERVER_KEY)
+    c = client_with({})
+    body = midtrans_notif("platform-lain-123", "50000.00")
+    r = c.post("/webhooks/midtrans", json=body)
+    assert r.status_code == 200 and r.json()["diabaikan"] is True

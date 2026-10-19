@@ -150,6 +150,74 @@ def test_publish_rejects_unapproved():
     assert r.status_code == 400
 
 
+def test_laporan_analytics_per_platform_kampanye_dan_periode():
+    from datetime import date
+
+    from app.analytics import build_report
+
+    camps = [
+        {"id": "c1", "title": "Podcast", "rate_per_1000_views": 5000, "cap_per_clip": 50000,
+         "budget_total": 500000, "budget_remaining": 400000}
+    ]
+    apps = [{"id": "a1", "campaign_id": "c1"}]
+    subs = [{
+        "id": "s1", "application_id": "a1", "status": "posted",
+        "posted_links": [
+            {"platform": "youtube", "url": "https://youtu.be/x"},
+            {"platform": "tiktok", "url": "https://tiktok.com/v/1"},
+        ],
+    }]
+    snaps = [
+        {"submission_id": "s1", "platform": "youtube", "views": 1000, "likes": 50, "comments": 5, "snapshot_date": "2026-10-10"},
+        {"submission_id": "s1", "platform": "youtube", "views": 3000, "likes": 90, "comments": 9, "snapshot_date": "2026-10-17"},
+        {"submission_id": "s1", "platform": "tiktok", "views": 1000, "likes": 10, "comments": 1, "snapshot_date": "2026-10-17"},
+    ]
+    r = build_report(camps, apps, subs, snaps, date(2026, 10, 12), date(2026, 10, 18))
+    assert r["days"] == 7 and len(r["series"]) == 7
+    assert r["totals"]["views"] == 4000 and r["totals"]["likes"] == 100 and r["totals"]["comments"] == 10
+    # 4.000 views = 4 x Rp5.000, dibagi menurut views: youtube 3/4, tiktok 1/4.
+    assert r["totals"]["estimate"] == 20000
+    # Instagram belum punya klip, tapi tetap muncul dengan nol.
+    assert {p["platform"]: p["estimate"] for p in r["platforms"]} == {"youtube": 15000, "tiktok": 5000, "instagram": 0}
+    assert r["campaigns"][0]["views"] == 4000 and r["campaigns"][0]["videos"] == 2
+    # Deret harian membawa snapshot terakhir maju: 12 Okt masih 1.000, 18 Okt sudah 4.000.
+    per_hari = {x["date"]: x["views"] for x in r["series"]}
+    assert per_hari["2026-10-12"] == 1000 and per_hari["2026-10-18"] == 4000
+    # Sebelum periode (11 Okt) sudah ada 1.000 views, jadi tambahan selama periode 3.000.
+    assert r["totals"]["views_gain"] == 3000
+
+
+def test_papan_peringkat_urut_views_dan_hanya_klip_tayang():
+    from app.analytics import papan_peringkat
+
+    apps = [
+        {"id": "a1", "editor_id": "ani"},
+        {"id": "a2", "editor_id": "budi"},
+        {"id": "a3", "editor_id": "cici"},
+    ]
+    subs = [
+        {"id": "s1", "application_id": "a1", "status": "posted"},
+        {"id": "s2", "application_id": "a1", "status": "posted"},
+        {"id": "s3", "application_id": "a2", "status": "posted"},
+        {"id": "s4", "application_id": "a3", "status": "submitted"},  # belum tayang, tidak dihitung
+    ]
+    snaps = [
+        {"submission_id": "s1", "platform": "youtube", "views": 5000},
+        {"submission_id": "s1", "platform": "tiktok", "views": 1000},
+        {"submission_id": "s2", "platform": "youtube", "views": 2000},
+        {"submission_id": "s3", "platform": "youtube", "views": 9000},
+        {"submission_id": "s4", "platform": "youtube", "views": 99999},
+    ]
+    nama = {"ani": "Ani", "budi": "Budi", "cici": "Cici"}
+    r = papan_peringkat(apps, subs, snaps, nama, saya="ani")
+    # Budi 9.000 views (1 klip) di atas Ani 8.000 views (2 klip). Cici tidak masuk karena belum tayang.
+    assert [p["nama"] for p in r["papan"]] == ["Budi", "Ani"]
+    assert r["papan"][1]["views"] == 8000 and r["papan"][1]["clips"] == 2
+    assert r["papan"][1]["poin"] == 8 and r["papan"][0]["poin"] == 9
+    assert r["saya"]["rank"] == 2 and r["saya"]["saya"] is True
+    assert r["jumlah"] == 2
+
+
 def test_analytics_endpoint():
     store = {
         "campaigns": [{"id": "c1", "creator_id": "creator-1"}],

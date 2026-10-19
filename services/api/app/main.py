@@ -4,7 +4,7 @@ from . import config
 from . import credits as creditsmod
 from . import r2 as r2mod
 from . import supabase_client as supa
-from . import xendit as xenditmod
+from . import midtrans as midtransmod
 from .authz import require_role, require_user
 from .schemas import (
     JobCreate,
@@ -163,6 +163,32 @@ def credit_balance(authorization: str | None = Header(default=None)):
     return {"balance": sum(r["amount"] for r in rows), "history": rows[-20:]}
 
 
+@app.get("/invoices")
+def list_invoices(authorization: str | None = Header(default=None)):
+    user_id = require_user(authorization)
+    client = supa.service_client()
+    rows = (
+        client.table("invoices")
+        .select("*")
+        .eq("user_id", user_id)
+        .order("issued_at", desc=True)
+        .execute()
+        .data
+        or []
+    )
+    return {"invoices": rows}
+
+
+@app.get("/invoices/{invoice_id}")
+def get_invoice(invoice_id: str, authorization: str | None = Header(default=None)):
+    user_id = require_user(authorization)
+    client = supa.service_client()
+    row = client.table("invoices").select("*").eq("id", invoice_id).single().execute().data
+    if not row or row["user_id"] != user_id:
+        raise HTTPException(status_code=404, detail="tidak-ditemukan")
+    return row
+
+
 @app.post("/topups")
 def create_topup(body: TopupCreate, authorization: str | None = Header(default=None)):
     import uuid
@@ -186,32 +212,41 @@ def create_topup(body: TopupCreate, authorization: str | None = Header(default=N
         "fee": q["fee"],
         "credits": q["credits"],
         "idempotency_key": idem,
+        "gateway_ref": f"{midtransmod.ORDER_PREFIX}{idem}",
     }
     saved = client.table("topup_intents").insert(intent).execute().data
     if not saved:
         raise HTTPException(status_code=500, detail="gagal-buat-topup")
     try:
-        inv = xenditmod.create_invoice(body.amount, idem)
+        tx = midtransmod.create_transaction(
+            f"{midtransmod.ORDER_PREFIX}{idem}", body.amount, "Top-up kredit TukangClip"
+        )
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e)[:100])
-    client.table("topup_intents").update({"xendit_id": inv["id"]}).eq(
-        "idempotency_key", idem
-    ).execute()
-    return {"payUrl": inv["url"], "credits": q["credits"], "fee": q["fee"]}
+    return {
+        "snapToken": tx["token"],
+        "payUrl": tx["redirect_url"],
+        "credits": q["credits"],
+        "fee": q["fee"],
+    }
 
 
-@app.post("/webhooks/xendit")
-async def xendit_webhook(request: Request):
-    if not xenditmod.callback_ok(request.headers.get("x-callback-token", "")):
-        raise HTTPException(status_code=401, detail="unauthorized")
+@app.post("/webhooks/midtrans")
+async def midtrans_webhook(request: Request):
     body = await request.json()
-    if body.get("status") != "PAID":
+    if not midtransmod.signature_ok(body):
+        raise HTTPException(status_code=401, detail="signature-tidak-valid")
+    # Akun yang sama bisa dipakai platform lain. Order bukan milik kita diabaikan dengan 200,
+    # supaya Midtrans tidak mengirim ulang notifikasi itu.
+    if not str(body.get("order_id", "")).startswith(midtransmod.ORDER_PREFIX):
+        return {"ok": True, "diabaikan": True}
+    if not midtransmod.is_paid(body):
         return {"ok": True}
     client = supa.service_client()
     intent = (
         client.table("topup_intents")
         .select("*")
-        .eq("xendit_id", body.get("id"))
+        .eq("gateway_ref", body.get("order_id"))
         .single()
         .execute()
         .data
@@ -233,7 +268,7 @@ async def xendit_webhook(request: Request):
         client.table("money_ledger").insert(
             {
                 "group_id": intent["id"],
-                "account": "cash:xendit",
+                "account": "cash:midtrans",
                 "user_id": intent["user_id"],
                 "campaign_id": intent["campaign_id"],
                 "debit": 0,
@@ -252,6 +287,7 @@ async def xendit_webhook(request: Request):
                 "idempotency_key": f"fund:{intent['idempotency_key']}:debit",
             }
         ).execute()
+        creditsmod.issue_invoice(client, intent)
         return {"ok": True}
     balance = creditsmod.balance_of(client, intent["user_id"])
     credited = client.table("ai_credit_ledger").insert(
@@ -259,13 +295,14 @@ async def xendit_webhook(request: Request):
             "user_id": intent["user_id"],
             "amount": intent["credits"],
             "balance_after": balance + intent["credits"],
-            "reason": "topup-xendit",
+            "reason": "topup-midtrans",
             "idempotency_key": f"topup:{intent['idempotency_key']}",
         }
     ).execute()
     if not credited.data:
         return {"ok": True}
     client.table("topup_intents").update({"status": "paid"}).eq("id", intent["id"]).execute()
+    creditsmod.issue_invoice(client, intent)
     return {"ok": True}
 
 
